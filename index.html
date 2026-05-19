@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://*.supabase.co https://mxprgfubfdozlrtemsgi.supabase.co wss://*.supabase.co;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Śniadaniowcy</title>
+<title>NutriCalc</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0F1117;--s:#1A1D27;--s2:#222636;--s3:#2A2F45;
-  --ac:#c98b3a;--ac2:#4A6FE8;--green:#3ECF8E;--red:#F87171;
+  --ac:#6C8EFF;--ac2:#4A6FE8;--green:#3ECF8E;--red:#F87171;
   --gold:#F5C842;--tx:#E2E8F0;--tx2:#94A3B8;--mu:#64748B;
   --bo:#2D3354;--bo2:#3D4570;--ye:#1E2235;
   --sh:0 4px 24px rgba(0,0,0,.4);--r:10px;
@@ -145,7 +145,7 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
 <div class="lo" id="lo"><div class="sp2"></div>Łączenie z bazą danych…</div>
 <div class="app">
   <div class="hdr">
-    <h1 style="color:var(--ac);font-family:'DM Serif Display',serif">🍽 Śniadaniowcy </h1>
+    <h1 style="color:var(--ac);font-family:'DM Serif Display',serif">🍽 NutriCalc</h1>
     <span style="opacity:.6;font-size:.82rem;color:var(--tx)">Kalkulator Wartości Odżywczych &amp; Food Cost</span>
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
       <div class="dot" id="dot"></div><span class="clb" id="clb" style="color:var(--mu)">łączenie…</span>
@@ -380,7 +380,7 @@ function renP(){
       if(f.t==='sl'){const o=f.o.map(x=>`<option${x===p[f.k]?' selected':''}>${x}</option>`).join('');c+=`<td><select class="ci sel" style="width:${f.w}px" onchange="upP('${p.id}','${f.k}',this.value)">${o}</select></td>`;}
       else{c+=`<td><input class="ci" type="${f.t==='nm'?'number':'text'}" value="${p[f.k]??''}" style="width:${f.w}px" step="${f.t==='nm'?'0.001':''}" onchange="upP('${p.id}','${f.k}',this.value)"></td>`;}
     });
-    c+=`<td style="color:var(--g);font-weight:600;font-size:.8rem;white-space:nowrap" id="g${p.id}">${g?g.toFixed(4)+' zł':'—'}</td>`;
+    c+=`<td style="color:var(--green);font-weight:600;font-size:.8rem;white-space:nowrap" id="g${p.id}">${g?g.toFixed(4)+' zł':'—'}</td>`;
     const tr=document.createElement('tr');tr.dataset.id=p.id;tr.innerHTML=c;tb.appendChild(tr);
   });
 }
@@ -519,15 +519,25 @@ async function rcB(){
 }
 function renBO(){
   const tb=document.getElementById('bob');tb.innerHTML='';
-  BO.forEach((d,i)=>{tb.innerHTML+=`<tr style="${i%2?'background:#FAF5F0':''}"><td><input type="checkbox" class="boc" data-id="${d.id}"></td><td style="font-weight:600">${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td>${nf(d.waga_g,0)}</td><td>${nf(d.kcal100,1)}</td><td>${nf(d.tl100)}</td><td>${nf(d.tlnas100)}</td><td>${nf(d.weg100)}</td><td>${nf(d.cukry100)}</td><td>${nf(d.bialka100)}</td><td>${nf(d.sol100,3)}</td><td style="font-size:.77rem;color:var(--re)">${d.alergeny||'—'}</td><td style="font-size:.77rem;color:#B7860B">${d.moze_zawierac||'—'}</td><td style="font-size:.77rem;max-width:180px;white-space:normal">${d.sklad_etykieta||'—'}</td></tr>`;});
+  BO.forEach((d,i)=>{tb.innerHTML+=`<tr style="${i%2?'background:var(--s2)':'background:var(--s)'}"><td><input type="checkbox" class="boc" data-id="${d.id}"></td><td style="font-weight:600;color:var(--tx)">${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td style='color:var(--tx)'>${nf(d.waga_g,0)}</td><td style='color:var(--tx)'>${nf(d.kcal100,1)}</td><td>${nf(d.tl100)}</td><td>${nf(d.tlnas100)}</td><td>${nf(d.weg100)}</td><td>${nf(d.cukry100)}</td><td>${nf(d.bialka100)}</td><td>${nf(d.sol100,3)}</td><td style="font-size:.77rem;color:var(--red)">${d.alergeny||'—'}</td><td style="font-size:.77rem;color:var(--gold)">${d.moze_zawierac||'—'}</td><td style="font-size:.77rem;max-width:220px">
+        <div style="max-height:44px;overflow:hidden;position:relative" id="skod${d.id}">
+          <span style="white-space:normal">${d.sklad_etykieta||'—'}</span>
+        </div>
+        ${d.sklad_etykieta&&d.sklad_etykieta.length>60?`<button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`:''}
+      </td></tr>`;});
 }
 function renBF(){
   const tb=document.getElementById('bfb');tb.innerHTML='';
   BF.forEach((d,i)=>{
     const ov=d.alert_cena>0&&d.koszt_wytw>d.alert_cena;
-    const bg=ov?'background:#FFF3F3':i%2?'background:#FAF5F0':'';
+    const bg=ov?'background:rgba(248,113,113,.08)':i%2?'background:var(--s2)':'background:var(--s)';
     const badge=ov?`<span class="ab">🚨 max ${zl(d.alert_cena)}</span>`:(d.alert_cena>0?'<span style="color:#2E7D32;font-size:.78rem">✅ OK</span>':'<span style="color:var(--mu);font-size:.75rem">—</span>');
-    tb.innerHTML+=`<tr style="${bg}"><td><input type="checkbox" class="bfc" data-id="${d.id}"></td><td style="font-weight:600;color:${ov?'var(--re)':'inherit'}">${ov?'🚨 ':''} ${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td>${nf(d.waga_g,0)}</td><td>${zl(d.koszt_sk)}</td><td>${zl(d.koszt_opak)}</td><td>${zl(d.koszt_rob)}</td><td style="font-weight:700;color:${ov?'var(--re)':'var(--ac)'}">${zl(d.koszt_wytw)}</td><td>${badge}</td><td style="font-weight:700;color:var(--re)">${zl(d.cena_sp)}</td><td>${nf(d.marza,0)}%</td><td>${d.sztuki||1}</td><td style="font-size:.77rem;max-width:180px;white-space:normal">${d.sklad_etykieta||'—'}</td></tr>`;
+    tb.innerHTML+=`<tr style="${bg}"><td><input type="checkbox" class="bfc" data-id="${d.id}"></td><td style="font-weight:600;color:${ov?'var(--re)':'inherit'}">${ov?'🚨 ':''} ${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td style='color:var(--tx)'>${nf(d.waga_g,0)}</td><td style='color:var(--tx)'>${zl(d.koszt_sk)}</td><td>${zl(d.koszt_opak)}</td><td>${zl(d.koszt_rob)}</td><td style="font-weight:700;color:${ov?'var(--re)':'var(--ac)'}">${zl(d.koszt_wytw)}</td><td>${badge}</td><td style="font-weight:700;color:var(--red)">${zl(d.cena_sp)}</td><td>${nf(d.marza,0)}%</td><td>${d.sztuki||1}</td><td style="font-size:.77rem;max-width:220px">
+        <div style="max-height:44px;overflow:hidden;position:relative" id="skod${d.id}">
+          <span style="white-space:normal">${d.sklad_etykieta||'—'}</span>
+        </div>
+        ${d.sklad_etykieta&&d.sklad_etykieta.length>60?`<button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`:''}
+      </td></tr>`;
   });
 }
 function togB(c,t){document.querySelectorAll(`.b${t[0]}c`).forEach(x=>x.checked=c.checked);}
@@ -725,6 +735,15 @@ function exportCSV(){
   a.href=url;a.download='NutriCalc_produkty_'+new Date().toLocaleDateString('pl-PL').replace(/\./g,'-')+'.csv';
   a.click();URL.revokeObjectURL(url);
   nt(`📤 Wyeksportowano ${PR.length} produktów!`);
+}
+
+
+function togSk(id,btn){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const expanded=el.style.maxHeight==='none';
+  el.style.maxHeight=expanded?'44px':'none';
+  btn.textContent=expanded?'▼ rozwiń':'▲ zwiń';
 }
 
 init();
