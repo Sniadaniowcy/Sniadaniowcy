@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; connect-src 'self' https://*.supabase.co https://mxprgfubfdozlrtemsgi.supabase.co wss://*.supabase.co;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NutriCalc</title>
+<title>Śniadaniowcy</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0F1117;--s:#1A1D27;--s2:#222636;--s3:#2A2F45;
-  --ac:#6C8EFF;--ac2:#4A6FE8;--green:#3ECF8E;--red:#F87171;
+  --ac:#c49616;--ac2:#4A6FE8;--green:#3ECF8E;--red:#F87171;
   --gold:#F5C842;--tx:#E2E8F0;--tx2:#94A3B8;--mu:#64748B;
   --bo:#2D3354;--bo2:#3D4570;--ye:#1E2235;
   --sh:0 4px 24px rgba(0,0,0,.4);--r:10px;
@@ -145,7 +145,7 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
 <div class="lo" id="lo"><div class="sp2"></div>Łączenie z bazą danych…</div>
 <div class="app">
   <div class="hdr">
-    <h1 style="color:var(--ac);font-family:'DM Serif Display',serif">🍽 NutriCalc</h1>
+    <h1 style="color:var(--ac);font-family:'DM Serif Display',serif">🍽 Śniadaniowcy</h1>
     <span style="opacity:.6;font-size:.82rem;color:var(--tx)">Kalkulator Wartości Odżywczych &amp; Food Cost</span>
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
       <div class="dot" id="dot"></div><span class="clb" id="clb" style="color:var(--mu)">łączenie…</span>
@@ -220,7 +220,14 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
           </div>
           <div class="sp"><h3>Zapisz do bazy dań</h3>
           <div><label style="color:rgba(255,255,255,.7)">Nazwa dania</label>
-          <input type="text" id="sn" placeholder="np. Chrupiąca Kiwi-zja…"></div>
+          <input type="text" id="sn" placeholder="np. Chrupiąca Kiwi-zja…" oninput="checkExisting()"></div>
+          <div id="existing-info" style="display:none;margin:6px 0;padding:6px 10px;background:rgba(255,200,0,.15);border-radius:6px;border:1px solid rgba(255,200,0,.3);font-size:.78rem;color:#f5c842">
+            ⚠ Danie o tej nazwie już istnieje — zostanie nadpisane
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
+            <input type="checkbox" id="overwrite-chk" checked style="width:auto;accent-color:var(--ac)">
+            <label style="color:rgba(255,255,255,.7);font-size:.78rem;margin:0">Nadpisz jeśli istnieje</label>
+          </div>
           <div class="spb">
             <button class="btn" onclick="sav('odz')">🥗 → Wartości Odżywcze</button>
             <button class="btn" onclick="sav('fc')">📊 → Food Cost</button>
@@ -238,8 +245,8 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
             <div><label>Koszt opakowania (zł)</label><input type="number" id="fo" value="0" step="0.01" oninput="rFC()"></div>
           </div></div>
           <div class="fcs"><h3>👷 Pracownik / Robocizna</h3><div class="g2">
-            <div><label>Stawka godzinowa (zł/h)</label><input type="number" id="fs" value="35" oninput="rFC()"></div>
-            <div><label>Czas produkcji (min)</label><input type="number" id="fc2" value="30" oninput="rFC()"></div>
+            <div><label>Stawka godzinowa (zł/h)</label><input type="number" id="fs" value="23" oninput="rFC()"></div>
+            <div><label>Czas produkcji (min)</label><input type="number" id="fc2" value="5" oninput="rFC()"></div>
             <div><label>Liczba sztuk</label><input type="number" id="fst" value="1" min="1" oninput="rFC()"></div>
             <div><label>Marża (%)</label><input type="number" id="fm" value="30" oninput="rFC()"></div>
           </div></div>
@@ -262,15 +269,20 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
           <div class="sr hl" style="margin-top:5px">
             <span>💶 Sugerowana cena sprzedaży</span><span class="sv" style="color:var(--re);font-size:1.2rem" id="frce">0,00 zł</span>
           </div>
+          <div style="margin-top:10px;padding:10px 0;border-top:1px solid var(--bo)">
+            <div style="font-size:.78rem;color:var(--mu);margin-bottom:6px">Zaproponuj marżę do równej ceny:</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap" id="marza-suggestions"></div>
+          </div>
         </div></div>
       </div>
     </div>
     <div class="tab" id="tab-baza-odz">
       <p class="pt">Baza Wartości Odżywczych</p>
       <p class="ps">Aktualizuje się automatycznie gdy zmienisz dane produktów w bazie.</p>
-      <div class="sh"><div style="display:flex;gap:7px">
+      <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
         <button class="btn bb sm" onclick="ltk('odz')">✏ Wczytaj do kalkulatora</button>
         <button class="btn br sm" onclick="dB('odz')">🗑 Usuń zaznaczone</button>
+        <input type="text" id="search-odz" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBO()">
       </div></div>
       <div class="tw"><table><thead><tr>
         <th style="width:30px"><input type="checkbox" onchange="togB(this,'odz')"></th>
@@ -282,10 +294,11 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
     <div class="tab" id="tab-baza-fc">
       <p class="pt">Baza Food Cost</p>
       <p class="ps">🚨 = przekroczony limit ceny. Aktualizuje się przy zmianach cen produktów.</p>
-      <div class="sh"><div style="display:flex;gap:7px;align-items:center">
+      <div class="sh"><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
         <button class="btn bb sm" onclick="ltk('fc')">✏ Wczytaj do kalkulatora</button>
         <button class="btn br sm" onclick="dB('fc')">🗑 Usuń zaznaczone</button>
-        <span style="font-size:.78rem;color:var(--mu);margin-left:4px">Alert ustawiasz w zakładce Food Cost</span>
+        <input type="text" id="search-fc" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBF()">
+        <span style="font-size:.78rem;color:var(--mu)">Alert → zakładka Food Cost</span>
       </div></div>
       <div class="tw"><table><thead><tr>
         <th style="width:30px"><input type="checkbox" onchange="togB(this,'fc')"></th>
@@ -416,7 +429,13 @@ function ST(n,b){
   if(n==='foodcost')rFC();
 }
 
-const nf=(v,d=2)=>{const f=parseFloat(v)||0;return f===0?'0':f.toFixed(d).replace(/\.?0+$/,'');};
+const nf=(v,d=2)=>{
+  const f=parseFloat(v)||0;
+  if(f===0) return '0';
+  const s=f.toFixed(d);
+  // Usuń zbędne zera po przecinku ale zostaw pełne liczby
+  return s.indexOf('.')>=0 ? s.replace(/\.?0+$/,'') : s;
+};
 const zl=v=>(parseFloat(v)||0).toFixed(2)+' zł';
 const nt=msg=>{const e=document.getElementById('nf');e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2800);};
 const cpEl=id=>{navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>nt('📋 Skopiowano!'));};
@@ -516,15 +535,49 @@ function rFC(){
   const rb=st*cz/60/sz,wt=t.ko+op+rb,lc=wt*sz,ce=ma<100?wt/(1-ma/100):0;
   const s=(id,v)=>document.getElementById(id).textContent=v;
   s('frsk',zl(t.ko));s('frop',zl(op));s('frrb',zl(rb));s('frwt',zl(wt));s('frlc',zl(lc)+` (${sz} szt)`);s('frce',zl(ce));
+  // Sugestie marży do równych cen
+  const sugEl=document.getElementById('marza-suggestions');
+  if(sugEl && wt>0){
+    const suggestions=[];
+    // Generuj równe ceny od wt*1.1 do wt*3, szukaj okrągłych
+    for(let mult=1.1;mult<=3.5;mult+=0.05){
+      const cenaProba=wt*mult;
+      const rounded=Math.ceil(cenaProba); // zaokrąglij w górę do pełnego złotego
+      if(rounded>0 && !suggestions.find(s=>s.cena===rounded)){
+        const marzaProba=((rounded-wt)/rounded*100).toFixed(0);
+        if(marzaProba>=10 && suggestions.length<5){
+          suggestions.push({cena:rounded, marza:marzaProba});
+        }
+      }
+    }
+    sugEl.innerHTML=suggestions.map(s=>
+      `<button onclick="setSuggestedMarza(${s.marza})"
+        style="background:rgba(196,150,22,.15);border:1px solid rgba(196,150,22,.3);
+               color:var(--ac);border-radius:6px;padding:5px 10px;cursor:pointer;
+               font-size:.78rem;font-weight:600;font-family:'DM Sans',sans-serif">
+        ${s.cena} zł <span style="opacity:.7">(${s.marza}%)</span>
+      </button>`
+    ).join('');
+  }
   const ae=document.getElementById('as');
   if(al>0){
     if(wt>al){ae.style.cssText='background:#FFEBEE;color:#C0392B;padding:9px 13px;border-radius:8px;font-size:.84rem;font-weight:600;width:100%;text-align:center;border:2px solid #FFCDD2';ae.innerHTML=`🚨 PRZEKROCZONO!<br>${zl(wt)} &gt; limit ${zl(al)}`;}
     else{ae.style.cssText='background:#E8F5E9;color:#2E7D32;padding:9px 13px;border-radius:8px;font-size:.84rem;font-weight:600;width:100%;text-align:center';ae.innerHTML=`✅ W normie<br>${zl(wt)} ≤ ${zl(al)}`;}
   }else{ae.style.cssText='background:var(--s2);color:var(--mu);padding:9px 13px;border-radius:8px;font-size:.84rem;font-weight:600;width:100%;text-align:center';ae.textContent='Alert wyłączony';}
 }
+function checkExisting(){
+  const nz=document.getElementById('sn').value.trim().toLowerCase();
+  const infoEl=document.getElementById('existing-info');
+  if(!infoEl)return;
+  const existsOdz=BO.some(d=>d.nazwa.toLowerCase()===nz);
+  const existsFC =BF.some(d=>d.nazwa.toLowerCase()===nz);
+  infoEl.style.display=(existsOdz||existsFC)?'block':'none';
+}
+
 async function sav(tg){
   const nz=document.getElementById('sn').value.trim();if(!nz){alert('Podaj nazwę dania!');return;}
   const{t,us}=gKD();if(!us.length){alert('Dodaj składniki z wagami!');return;}
+  const overwrite=document.getElementById('overwrite-chk')?.checked ?? true;
   const wg=t.wg||1;
   const op=parseFloat(document.getElementById('fo')?.value)||0;
   const st=parseFloat(document.getElementById('fs')?.value)||35;
@@ -544,11 +597,24 @@ async function sav(tg){
   const td=new Date().toLocaleDateString('pl-PL');
   if(tg==='odz'||tg==='both'){
     const e={nazwa:nz,data:td,waga_g:t.wg,kcal100:t.kc/wg*100,tl100:t.tl/wg*100,tlnas100:t.tn/wg*100,weg100:t.we/wg*100,cukry100:t.cu/wg*100,bialka100:t.bi/wg*100,sol100:t.so/wg*100,alergeny:[...aS].join(', ')||'Brak',moze_zawierac:[...mS].join(', ')||'Brak',sklad_etykieta:sk,skladniki:skl};
-    const r=await ins('baza_odz',e);if(r&&r[0])BO.push(r[0]);
+    const existIdx=BO.findIndex(d=>d.nazwa.toLowerCase()===nz.toLowerCase());
+    if(overwrite && existIdx>=0){
+      await dbU('baza_odz',BO[existIdx].id,e);
+      Object.assign(BO[existIdx],e);
+      nt(`✏ "${nz}" nadpisano w Bazie Wartości Odżywczych!`);
+    } else {
+      const r=await ins('baza_odz',e);if(r&&r[0])BO.push(r[0]);
+    }
   }
   if(tg==='fc'||tg==='both'){
     const e={nazwa:nz,data:td,waga_g:t.wg,koszt_sk:t.ko,koszt_opak:op,koszt_rob:rb,koszt_wytw:wt,cena_sp:ce,marza:ma,sztuki:sz,sklad_etykieta:sk,skladniki:skl,fc_params:{opak:op,stawka:st,czas:cz,sztuki:sz,marza:ma},alert_cena:al};
-    const r=await ins('baza_fc',e);if(r&&r[0])BF.push(r[0]);
+    const existIdx=BF.findIndex(d=>d.nazwa.toLowerCase()===nz.toLowerCase());
+    if(overwrite && existIdx>=0){
+      await dbU('baza_fc',BF[existIdx].id,e);
+      Object.assign(BF[existIdx],e);
+    } else {
+      const r=await ins('baza_fc',e);if(r&&r[0])BF.push(r[0]);
+    }
   }
   nt(`✅ "${nz}" zapisane!`);
 }
@@ -576,8 +642,9 @@ async function rcB(){
     Object.assign(d,u);await dbU('baza_fc',d.id,u);}
 }
 function renBO(){
+  const q=(document.getElementById('search-odz')?.value||'').toLowerCase();
   const tb=document.getElementById('bob');tb.innerHTML='';
-  BO.forEach((d,i)=>{tb.innerHTML+=`<tr style="${i%2?'background:var(--s2)':'background:var(--s)'}"><td><input type="checkbox" class="boc" data-id="${d.id}"></td><td style="font-weight:600;color:var(--tx)">${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td style='color:var(--tx)'>${nf(d.waga_g,0)}</td><td style='color:var(--tx)'>${nf(d.kcal100,1)}</td><td>${nf(d.tl100)}</td><td>${nf(d.tlnas100)}</td><td>${nf(d.weg100)}</td><td>${nf(d.cukry100)}</td><td>${nf(d.bialka100)}</td><td>${nf(d.sol100,3)}</td><td style="font-size:.77rem;color:var(--red)">${d.alergeny||'—'}</td><td style="font-size:.77rem;color:var(--gold)">${d.moze_zawierac||'—'}</td><td style="font-size:.77rem;max-width:220px">
+  BO.filter(d=>!q||d.nazwa.toLowerCase().includes(q)).forEach((d,i)=>{tb.innerHTML+=`<tr style="${i%2?'background:var(--s2)':'background:var(--s)'}"><td><input type="checkbox" class="boc" data-id="${d.id}"></td><td style="font-weight:600;color:var(--tx)">${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td style='color:var(--tx)'>${nf(d.waga_g,0)}</td><td style='color:var(--tx)'>${nf(d.kcal100,1)}</td><td>${nf(d.tl100)}</td><td>${nf(d.tlnas100)}</td><td>${nf(d.weg100)}</td><td>${nf(d.cukry100)}</td><td>${nf(d.bialka100)}</td><td>${nf(d.sol100,3)}</td><td style="font-size:.77rem;color:var(--red)">${d.alergeny||'—'}</td><td style="font-size:.77rem;color:var(--gold)">${d.moze_zawierac||'—'}</td><td style="font-size:.77rem;max-width:220px">
         <div style="max-height:44px;overflow:hidden;position:relative" id="skod${d.id}">
           <span style="white-space:normal">${d.sklad_etykieta||'—'}</span>
         </div>
@@ -585,8 +652,9 @@ function renBO(){
       </td></tr>`;});
 }
 function renBF(){
+  const q=(document.getElementById('search-fc')?.value||'').toLowerCase();
   const tb=document.getElementById('bfb');tb.innerHTML='';
-  BF.forEach((d,i)=>{
+  BF.filter(d=>!q||d.nazwa.toLowerCase().includes(q)).forEach((d,i)=>{
     const ov=d.alert_cena>0&&d.koszt_wytw>d.alert_cena;
     const bg=ov?'background:rgba(248,113,113,.08)':i%2?'background:var(--s2)':'background:var(--s)';
     const badge=ov?`<span class="ab">🚨 max ${zl(d.alert_cena)}</span>`:(d.alert_cena>0?'<span style="color:#2E7D32;font-size:.78rem">✅ OK</span>':'<span style="color:var(--mu);font-size:.75rem">—</span>');
@@ -919,9 +987,12 @@ function renderXmlTable(){
     const matched = saved.prodId;
     const prod    = matched ? PR.find(p=>p.id===matched) : null;
     const aktCena = prod ? (parseFloat(prod.cena_zakupu)||0).toFixed(2)+' zł' : '—';
+    const hasName = poz.skrocona || (xmlMappings[poz.nazwaFaktury]||{}).customName;
     const status  = prod
-      ? `<span style="color:var(--green);font-weight:600;font-size:.75rem">✓ ok</span>`
-      : `<span style="color:var(--mu);font-size:.75rem">brak</span>`;
+      ? `<span style="color:var(--green);font-weight:600;font-size:.75rem">✓ aktualizuj</span>`
+      : hasName
+        ? `<span style="color:var(--gold);font-weight:600;font-size:.75rem">＋ nowy</span>`
+        : `<span style="color:var(--mu);font-size:.75rem">— pomiń</span>`;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1030,7 +1101,11 @@ function xmlSimilarity(a,b){
 }
 
 function xmlUpdateApplyBtn(){
-  const cnt = xmlPozycje.filter(p=>xmlMappings[p.nazwaFaktury]?.prodId).length;
+  // Count rows that will do something: either have prodId (update) or customName (new product)
+  const cnt = xmlPozycje.filter(p=>{
+    const m = xmlMappings[p.nazwaFaktury]||{};
+    return m.prodId || m.customName || p.skrocona;
+  }).length;
   document.getElementById('xml-match-count').textContent=cnt;
   document.getElementById('xml-apply-btn').style.display=cnt>0?'inline-flex':'none';
 }
@@ -1038,38 +1113,53 @@ function xmlUpdateApplyBtn(){
 async function xmlApplyPrices(){
   const btn=document.getElementById('xml-apply-btn');
   btn.textContent='⏳ Aktualizuję…';btn.disabled=true;
-  let updated=0;
+  let updated=0, added=0;
 
   for(const poz of xmlPozycje){
-    const m = xmlMappings[poz.nazwaFaktury];
-    if(!m?.prodId) continue;
-    const prod = PR.find(p=>p.id===m.prodId);
-    if(!prod) continue;
+    const m = xmlMappings[poz.nazwaFaktury] || {};
+    const customName = m.customName || poz.skrocona;
+    if(!customName && !m.prodId) continue; // nic nie wpisane, pomijamy
 
-    // Oblicz cena_zakupu = cena brutto za całe zamówienie (ilosc sztuk)
-    // ilosc_zakupu = ilość opakowań z faktury
-    // waga_opak_g  = waga jednego opakowania
     const newData = {
-      cena_zakupu:   poz.wartosc_brutto,  // brutto za całą linię
-      ilosc_zakupu:  poz.ilosc,           // ile sztuk kupiono
-      jednostka:     poz.jednostka || prod.jednostka,
-      waga_opak_g:   poz.wagazOpak || prod.waga_opak_g,
+      cena_zakupu:  poz.wartosc_brutto,
+      ilosc_zakupu: poz.ilosc,
+      jednostka:    poz.jednostka || 'szt',
+      waga_opak_g:  poz.wagazOpak || 0,
     };
 
-    // Jeśli użytkownik wpisał własną nazwę — zaktualizuj też nazwę
-    if(m.customName && m.customName !== prod.nazwa){
-      // tylko jeśli użytkownik jawnie zmienił
+    if(m.prodId){
+      // Aktualizuj istniejący produkt
+      const prod = PR.find(p=>p.id===m.prodId);
+      if(!prod) continue;
+      await dbU('produkty', m.prodId, newData);
+      Object.assign(prod, newData);
+      updated++;
+    } else if(customName){
+      // Dodaj nowy produkt
+      const nowyProd = {
+        firma: '',
+        nazwa: customName,
+        pelny_sklad: '', alergeny: '', moze_zawierac: '',
+        kcal:0, tluszcze:0, tluszcze_nas:0, weglowodany:0,
+        cukry:0, bialka:0, sole:0,
+        ...newData
+      };
+      const res = await ins('produkty', nowyProd);
+      if(res && res[0]){
+        PR.push(res[0]);
+        // Zapamiętaj mapowanie na przyszłość
+        xmlMappings[poz.nazwaFaktury] = { ...m, prodId: res[0].id };
+        added++;
+      }
     }
-
-    await dbU('produkty', m.prodId, newData);
-    Object.assign(prod, newData);
-    updated++;
   }
 
-  if(updated>0) await rcB();
-  btn.innerHTML=`✅ Zaktualizuj ceny (<span id="xml-match-count">${xmlPozycje.filter(p=>xmlMappings[p.nazwaFaktury]?.prodId).length}</span> produktów)`;
+  xmlSaveMappings();
+  if(updated+added>0) await rcB();
+  btn.innerHTML=`✅ Zaktualizuj ceny (<span id="xml-match-count">${xmlPozycje.filter(p=>xmlMappings[p.nazwaFaktury]?.prodId||(xmlMappings[p.nazwaFaktury]?.customName||p.skrocona)).length}</span> produktów)`;
   btn.disabled=false;
-  nt(`✅ Zaktualizowano ${updated} produktów! Food cost przeliczony.`);
+  const msg = [updated && `zaktualizowano ${updated}`, added && `dodano ${added} nowych`].filter(Boolean).join(', ');
+  nt(`✅ ${msg} produktów! Food cost przeliczony.`);
   renP();
 }
 
@@ -1103,6 +1193,11 @@ function togSk(id,btn){
   const expanded=el.style.maxHeight==='none';
   el.style.maxHeight=expanded?'44px':'none';
   btn.textContent=expanded?'▼ rozwiń':'▲ zwiń';
+}
+
+function setSuggestedMarza(marza){
+  const el=document.getElementById('fm');
+  if(el){ el.value=marza; rFC(); }
 }
 
 init();
