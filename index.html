@@ -128,6 +128,34 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
 .mfoot{padding:12px 22px 16px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--bo);background:var(--s2)}
 .map-row{display:grid;grid-template-columns:180px 30px 220px;align-items:center;gap:8px;margin-bottom:8px;font-size:.85rem}
 
+/* MODAL POTWIERDZENIA ZAPISU */
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.confirm-box{background:var(--s);border:2px solid var(--ac);border-radius:14px;
+  width:100%;max-width:520px;box-shadow:0 20px 60px rgba(0,0,0,.6);
+  animation:cfIn .2s ease}
+@keyframes cfIn{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.confirm-hdr{background:var(--ac);padding:16px 22px;border-radius:12px 12px 0 0;
+  display:flex;align-items:center;gap:10px}
+.confirm-hdr .icon{font-size:1.4rem}
+.confirm-hdr h2{font-family:'DM Serif Display',serif;font-size:1.1rem;color:#1a1a1a;margin:0}
+.confirm-body{padding:20px 22px}
+.confirm-row{display:flex;justify-content:space-between;align-items:flex-start;
+  padding:8px 0;border-bottom:1px solid var(--bo);font-size:.84rem;gap:12px}
+.confirm-row:last-child{border:none}
+.confirm-row .lbl{color:var(--mu);font-weight:600;min-width:130px;font-size:.78rem;padding-top:2px}
+.confirm-row .val{color:var(--tx);text-align:right;line-height:1.4}
+.confirm-row .val.big{font-family:'DM Serif Display',serif;font-size:1.1rem;color:var(--ac)}
+.confirm-row .val.sklad{font-size:.76rem;color:var(--mu);max-width:300px;white-space:normal;text-align:left}
+.confirm-footer{padding:14px 22px 18px;display:flex;gap:10px;justify-content:flex-end;
+  border-top:1px solid var(--bo)}
+.confirm-footer .btn-cancel{background:var(--s2);color:var(--mu);border:1px solid var(--bo)}
+.confirm-footer .btn-save{background:var(--ac);color:#1a1a1a;font-size:.9rem;padding:10px 22px}
+.overwrite-badge{background:rgba(237,179,19,.15);border:1px solid rgba(237,179,19,.3);
+  color:var(--ac);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;margin-left:6px}
+.new-badge{background:rgba(62,207,142,.12);border:1px solid rgba(62,207,142,.3);
+  color:var(--green);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;margin-left:6px}
+
 /* MISC */
 .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 
@@ -446,6 +474,20 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     </div>
   </div>
 </div>
+<!-- MODAL POTWIERDZENIA ZAPISU -->
+<div class="confirm-overlay" id="confirm-overlay" style="display:none" onclick="if(event.target===this)closeConfirm()">
+  <div class="confirm-box">
+    <div class="confirm-hdr">
+      <span class="icon">💾</span>
+      <h2 id="cf-title">Potwierdź zapis dania</h2>
+    </div>
+    <div class="confirm-body" id="cf-body"></div>
+    <div class="confirm-footer">
+      <button class="btn confirm-footer btn-cancel" onclick="closeConfirm()">✕ Anuluj</button>
+      <button class="btn confirm-footer btn-save" id="cf-save-btn" onclick="confirmSave()">✅ Tak, zapisz</button>
+    </div>
+  </div>
+</div>
 <div class="nf" id="nf"></div>
 <script>
 /*
@@ -713,10 +755,111 @@ function hideDanieAC(){
   if(ac) ac.style.display='none';
 }
 
-async function sav(tg){
-  const nz=document.getElementById('sn').value.trim();if(!nz){alert('Podaj nazwę dania!');return;}
-  const{t,us}=gKD();if(!us.length){alert('Dodaj składniki z wagami!');return;}
+let _pendingSave = null;
+
+function sav(tg){
+  const nz=document.getElementById('sn').value.trim();
+  if(!nz){alert('Podaj nazwę dania!');return;}
+  const{t,us}=gKD();
+  if(!us.length){alert('Dodaj składniki z wagami!');return;}
   const overwrite=document.getElementById('overwrite-chk')?.checked ?? true;
+  const wg=t.wg||1;
+
+  // Sprawdź czy istnieje
+  const existOdz = tg==='odz'||tg==='both' ? BO.find(d=>d.nazwa.toLowerCase()===nz.toLowerCase()) : null;
+  const existFC  = tg==='fc' ||tg==='both' ? BF.find(d=>d.nazwa.toLowerCase()===nz.toLowerCase()) : null;
+  const isOverwrite = overwrite && (existOdz||existFC);
+
+  // Zbierz podgląd składników
+  const skladniki = [...us].sort((a,b)=>b.w-a.w);
+  const skladPreview = skladniki.slice(0,5).map(({p,w})=>`${p.nazwa} (${w}g)`).join(', ')
+    + (skladniki.length>5 ? ` +${skladniki.length-5} więcej` : '');
+
+  // Buduj treść modala
+  const targetLabel = tg==='both'?'Obie bazy':tg==='odz'?'Baza Wartości Odżywczych':'Baza Food Cost';
+  const badge = isOverwrite
+    ? `<span class="overwrite-badge">✏ Nadpisanie</span>`
+    : `<span class="new-badge">＋ Nowy wpis</span>`;
+
+  document.getElementById('cf-title').innerHTML = `Potwierdź zapis — ${targetLabel}`;
+
+  let rows = `
+    <div class="confirm-row">
+      <span class="lbl">Nazwa dania</span>
+      <span class="val big">${nz} ${badge}</span>
+    </div>
+    <div class="confirm-row">
+      <span class="lbl">Łączna waga</span>
+      <span class="val">${nf(t.wg,0)} g</span>
+    </div>
+    <div class="confirm-row">
+      <span class="lbl">Energia / 100g</span>
+      <span class="val">${nf(t.kc/wg*100,1)} kcal</span>
+    </div>
+    <div class="confirm-row">
+      <span class="lbl">Koszt składników</span>
+      <span class="val">${zl(t.ko)}</span>
+    </div>`;
+
+  if(tg==='fc'||tg==='both'){
+    const op=parseFloat(document.getElementById('fo')?.value)||0;
+    const st=parseFloat(document.getElementById('fs')?.value)||23;
+    const cz=parseFloat(document.getElementById('fc2')?.value)||5;
+    const sz=Math.max(1,parseInt(document.getElementById('fst')?.value)||1);
+    const rb=st*cz/60/sz, wt=t.ko+op+rb;
+    const ce=parseFloat(document.getElementById('fc-cena-target')?.value)||0;
+    const ma=ce>0&&wt>0?((ce-wt)/ce*100):0;
+    rows += `
+    <div class="confirm-row">
+      <span class="lbl">Koszt wytworzenia</span>
+      <span class="val">${zl(wt)}</span>
+    </div>
+    <div class="confirm-row">
+      <span class="lbl">Cena sprzedaży</span>
+      <span class="val" style="color:var(--ac);font-weight:700">${ce>0?zl(ce):'— nie ustawiono'}</span>
+    </div>
+    <div class="confirm-row">
+      <span class="lbl">Marża</span>
+      <span class="val" style="color:${ma>=30?'var(--green)':ma>=15?'var(--ac)':'var(--red)'};font-weight:700">${ma>0?ma.toFixed(1)+'%':'—'}</span>
+    </div>`;
+  }
+
+  rows += `
+    <div class="confirm-row">
+      <span class="lbl">Składniki (${skladniki.length})</span>
+      <span class="val sklad">${skladPreview}</span>
+    </div>`;
+
+  if(isOverwrite){
+    rows += `
+    <div class="confirm-row" style="background:rgba(237,179,19,.06);border-radius:6px;padding:8px 10px;border:1px solid rgba(237,179,19,.2)">
+      <span class="lbl" style="color:var(--ac)">⚠ Uwaga</span>
+      <span class="val" style="color:var(--ac);font-size:.8rem">Istniejące danie zostanie nadpisane. Poprzednie dane nie będą możliwe do odzyskania.</span>
+    </div>`;
+  }
+
+  document.getElementById('cf-body').innerHTML = rows;
+  document.getElementById('confirm-overlay').style.display = 'flex';
+
+  // Zapamiętaj parametry do późniejszego wykonania
+  _pendingSave = {tg, nz, overwrite};
+}
+
+function closeConfirm(){
+  document.getElementById('confirm-overlay').style.display='none';
+  _pendingSave=null;
+}
+
+async function confirmSave(){
+  if(!_pendingSave) return;
+  const {tg, nz, overwrite} = _pendingSave;
+  closeConfirm();
+  await doSave(tg, nz, overwrite);
+}
+
+async function doSave(tg, nz, overwrite){
+  const{t,us}=gKD();
+  if(!us.length) return;
   const wg=t.wg||1;
   const op=parseFloat(document.getElementById('fo')?.value)||0;
   const st=parseFloat(document.getElementById('fs')?.value)||35;
