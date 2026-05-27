@@ -767,31 +767,86 @@ async function rcB(){
     Object.assign(d,u);await dbU('baza_fc',d.id,u);}
 }
 function renBO(){
-  const q=(document.getElementById('search-odz')?.value||'').toLowerCase();
-  const tb=document.getElementById('bob');tb.innerHTML='';
-  BO.filter(d=>!q||d.nazwa.toLowerCase().includes(q)).forEach((d,i)=>{tb.innerHTML+=`<tr style="${i%2?'background:var(--s2)':'background:var(--s)'}"><td><input type="checkbox" class="boc" data-id="${d.id}"></td><td style="font-weight:600;color:var(--tx)">${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td style='color:var(--tx)'>${nf(d.waga_g,0)}</td><td style='color:var(--tx)'>${nf(d.kcal100,1)}</td><td>${nf(d.tl100)}</td><td>${nf(d.tlnas100)}</td><td>${nf(d.weg100)}</td><td>${nf(d.cukry100)}</td><td>${nf(d.bialka100)}</td><td>${nf(d.sol100,3)}</td><td style="font-size:.77rem;color:var(--red)">${d.alergeny||'—'}</td><td style="font-size:.77rem;color:var(--gold)">${d.moze_zawierac||'—'}</td><td style="font-size:.77rem;max-width:220px">
-        <div style="max-height:44px;overflow:hidden;position:relative" id="skod${d.id}">
-          <span style="white-space:normal">${d.sklad_etykieta||'—'}</span>
-        </div>
-        ${d.sklad_etykieta&&d.sklad_etykieta.length>60?`<button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`:''}
-      </td></tr>`;});
+  const q  = (document.getElementById('search-odz')?.value||'').toLowerCase();
+  const af = activeFolder['odz'];
+  const tb = document.getElementById('bob'); tb.innerHTML='';
+  const list = BO.filter(d=>{
+    if(q && !d.nazwa.toLowerCase().includes(q)) return false;
+    if(af==='__all__')  return true;
+    if(af==='__none__') return !d.kategoria;
+    return d.kategoria===af;
+  });
+  list.forEach((d,i)=>{
+    const bg=i%2?'background:var(--s2)':'background:var(--s)';
+    const katBadge=d.kategoria
+      ?`<span style="background:rgba(237,179,19,.15);border:1px solid rgba(237,179,19,.3);color:var(--ac);border-radius:10px;padding:1px 7px;font-size:.7rem">${d.kategoria}</span>`
+      :`<span style="color:var(--mu);font-size:.7rem">—</span>`;
+    const sklRow=d.sklad_etykieta&&d.sklad_etykieta.length>60
+      ?`<div style="max-height:44px;overflow:hidden" id="skod${d.id}"><span style="white-space:normal">${d.sklad_etykieta}</span></div>
+        <button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`
+      :(d.sklad_etykieta||'—');
+    tb.innerHTML+=`<tr style="${bg};cursor:grab"
+      draggable="true"
+      ondragstart="event.dataTransfer.setData('text/plain','${d.id}')"
+      oncontextmenu="showMoveMenu(event,'odz','${d.id}','${d.nazwa.replace(/'/g,"\\'").replace(/"/g,'&quot;')}');return false">
+      <td><input type="checkbox" class="boc" data-id="${d.id}"></td>
+      <td style="font-weight:600;color:var(--tx)">${d.nazwa}</td>
+      <td>${katBadge}</td>
+      <td style="color:var(--mu);font-size:.78rem">${d.data||''}</td>
+      <td style="color:var(--tx)">${nf(d.waga_g,0)}</td>
+      <td>${nf(d.kcal100,1)}</td><td>${nf(d.tl100)}</td><td>${nf(d.tlnas100)}</td>
+      <td>${nf(d.weg100)}</td><td>${nf(d.cukry100)}</td><td>${nf(d.bialka100)}</td>
+      <td>${nf(d.sol100,3)}</td>
+      <td style="font-size:.77rem;color:var(--red)">${d.alergeny||'—'}</td>
+      <td style="font-size:.77rem;color:#B7860B">${d.moze_zawierac||'—'}</td>
+      <td style="font-size:.77rem;max-width:180px">${sklRow}</td>
+    </tr>`;
+  });
+  renderFolders('odz');
 }
 function renBF(){
-  const q=(document.getElementById('search-fc')?.value||'').toLowerCase();
-  const tb=document.getElementById('bfb');tb.innerHTML='';
-  BF.filter(d=>!q||d.nazwa.toLowerCase().includes(q)).forEach((d,i)=>{
+  const q  = (document.getElementById('search-fc')?.value||'').toLowerCase();
+  const af = activeFolder['fc'];
+  const tb = document.getElementById('bfb'); tb.innerHTML='';
+  const list = BF.filter(d=>{
+    if(q && !d.nazwa.toLowerCase().includes(q)) return false;
+    if(af==='__all__')  return true;
+    if(af==='__none__') return !d.kategoria;
+    return d.kategoria===af;
+  });
+  list.forEach((d,i)=>{
     const ov=d.alert_cena>0&&d.koszt_wytw>d.alert_cena;
     const bg=ov?'background:rgba(248,113,113,.08)':i%2?'background:var(--s2)':'background:var(--s)';
-    const badge=ov?`<span class="ab">🚨 max ${zl(d.alert_cena)}</span>`:(d.alert_cena>0?'<span style="color:#2E7D32;font-size:.78rem">✅ OK</span>':'<span style="color:var(--mu);font-size:.75rem">—</span>');
-    tb.innerHTML+=`<tr style="${bg}"><td><input type="checkbox" class="bfc" data-id="${d.id}"></td><td style="font-weight:600;color:${ov?'var(--re)':'inherit'}">${ov?'🚨 ':''} ${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td style='color:var(--tx)'>${nf(d.waga_g,0)}</td><td style='color:var(--tx)'>${zl(d.koszt_sk)}</td><td>${zl(d.koszt_opak)}</td><td>${zl(d.koszt_rob)}</td><td style="font-weight:700;color:${ov?'var(--re)':'var(--ac)'}">${zl(d.koszt_wytw)}</td><td>${badge}</td><td style="font-weight:700;color:var(--red)">${zl(d.cena_sp)}</td><td style="font-weight:700;color:${
-      d.marza>=30?'var(--green)':d.marza>=15?'var(--ac)':d.marza>0?'var(--red)':'var(--mu)'
-    }">${nf(d.marza,1)}%</td><td>${d.sztuki||1}</td><td style="font-size:.77rem;max-width:220px">
-        <div style="max-height:44px;overflow:hidden;position:relative" id="skod${d.id}">
-          <span style="white-space:normal">${d.sklad_etykieta||'—'}</span>
-        </div>
-        ${d.sklad_etykieta&&d.sklad_etykieta.length>60?`<button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`:''}
-      </td></tr>`;
+    const badge=ov
+      ?`<span class="ab">🚨 max ${zl(d.alert_cena)}</span>`
+      :(d.alert_cena>0?'<span style="color:#2E7D32;font-size:.78rem">✅ OK</span>':'<span style="color:var(--mu);font-size:.75rem">—</span>');
+    const katBadge=d.kategoria
+      ?`<span style="background:rgba(237,179,19,.15);border:1px solid rgba(237,179,19,.3);color:var(--ac);border-radius:10px;padding:1px 7px;font-size:.7rem">${d.kategoria}</span>`
+      :`<span style="color:var(--mu);font-size:.7rem">—</span>`;
+    const sklRow=d.sklad_etykieta&&d.sklad_etykieta.length>60
+      ?`<div style="max-height:44px;overflow:hidden" id="skfc${d.id}"><span style="white-space:normal">${d.sklad_etykieta}</span></div>
+        <button onclick="togSk('skfc${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`
+      :(d.sklad_etykieta||'—');
+    const marzaColor=d.marza>=30?'var(--green)':d.marza>=15?'var(--ac)':d.marza>0?'var(--red)':'var(--mu)';
+    tb.innerHTML+=`<tr style="${bg};cursor:grab"
+      draggable="true"
+      ondragstart="event.dataTransfer.setData('text/plain','${d.id}')"
+      oncontextmenu="showMoveMenu(event,'fc','${d.id}','${d.nazwa.replace(/'/g,"\\'").replace(/"/g,'&quot;')}');return false">
+      <td><input type="checkbox" class="bfc" data-id="${d.id}"></td>
+      <td style="font-weight:600;color:${ov?'var(--red)':'var(--tx)'}">${ov?'🚨 ':''}${d.nazwa}</td>
+      <td>${katBadge}</td>
+      <td style="color:var(--mu);font-size:.78rem">${d.data||''}</td>
+      <td>${nf(d.waga_g,0)}</td><td>${zl(d.koszt_sk)}</td><td>${zl(d.koszt_opak)}</td>
+      <td>${zl(d.koszt_rob)}</td>
+      <td style="font-weight:700;color:${ov?'var(--red)':'var(--ac)'}">${zl(d.koszt_wytw)}</td>
+      <td>${badge}</td>
+      <td style="font-weight:700;color:var(--red)">${zl(d.cena_sp)}</td>
+      <td style="font-weight:700;color:${marzaColor}">${nf(d.marza,1)}%</td>
+      <td>${d.sztuki||1}</td>
+      <td style="font-size:.77rem;max-width:180px">${sklRow}</td>
+    </tr>`;
   });
+  renderFolders('fc');
 }
 function togB(c,t){document.querySelectorAll(`.b${t[0]}c`).forEach(x=>x.checked=c.checked);}
 async function dB(t){
