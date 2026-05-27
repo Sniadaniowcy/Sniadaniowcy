@@ -9,7 +9,7 @@
 <style>
 :root{
   --bg:#0F1117;--s:#1A1D27;--s2:#222636;--s3:#2A2F45;
-  --ac:#c49616;--ac2:#4A6FE8;--green:#3ECF8E;--red:#F87171;
+  --ac:#edb313;--ac2:#4A6FE8;--green:#3ECF8E;--red:#F87171;
   --gold:#F5C842;--tx:#E2E8F0;--tx2:#94A3B8;--mu:#64748B;
   --bo:#2D3354;--bo2:#3D4570;--ye:#1E2235;
   --sh:0 4px 24px rgba(0,0,0,.4);--r:10px;
@@ -130,20 +130,32 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
 
 /* MISC */
 .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+
+/* FOLDERY */
+.folders-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.folder-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border:1.5px solid var(--bo);
+  border-radius:20px;background:var(--s);color:var(--mu);cursor:pointer;font-size:.82rem;
+  font-weight:500;transition:all .2s;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.folder-btn:hover{border-color:var(--ac);color:var(--ac)}
+.folder-btn.active{background:var(--ac);border-color:var(--ac);color:#1a1a1a;font-weight:700}
+.folder-btn .cnt-badge{background:rgba(0,0,0,.2);border-radius:10px;padding:1px 6px;font-size:.72rem}
+.folder-new{background:none;border:1.5px dashed var(--bo);color:var(--mu);cursor:pointer;
+  border-radius:20px;padding:6px 14px;font-size:.82rem;font-family:'DM Sans',sans-serif;transition:.2s}
+.folder-new:hover{border-color:var(--ac);color:var(--ac)}
+.drag-over{background:rgba(237,179,19,.08)!important;border:2px dashed var(--ac)!important}
+tbody tr[draggable]{cursor:grab}
+tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
+.folder-header{background:var(--s2);border-bottom:2px solid var(--ac)}
+.folder-header td{padding:8px 12px;font-weight:700;color:var(--ac);font-size:.82rem}
 .c2{display:grid;grid-template-columns:1fr 360px;gap:18px}
 @media(max-width:900px){.c2{grid-template-columns:1fr}.rg{grid-template-columns:repeat(2,1fr)}}
 
-/* FOLDERS */
-.fs{margin-bottom:10px;border:1px solid var(--bo);border-radius:var(--r);overflow:hidden}
-.fh{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--s2);cursor:pointer;user-select:none;font-weight:600;font-size:.86rem;transition:background .15s;border:2px solid transparent;border-radius:0}
-.fh:hover{background:var(--s3)}
-.fh.dov{background:rgba(196,150,22,.18);border-color:var(--ac)}
-.ftog{font-size:.7rem;color:var(--mu);min-width:12px;transition:transform .15s}
-.fct{background:var(--s3);border-radius:20px;padding:1px 8px;font-size:.74rem;color:var(--mu);margin-left:auto;flex-shrink:0}
-.fbd{display:none}.fbd.open{display:block}
-.fbd .tw{border-radius:0;max-height:380px}
-tr[draggable="true"]{cursor:grab}
-tr.drg{opacity:.3;background:rgba(196,150,22,.08)!important}
+/* BAZA TABLES - equal column widths */
+#bob td, #bob th, #bfb td, #bfb th{min-width:110px;max-width:200px}
+#bob td:first-child, #bfb td:first-child,
+#bob th:first-child, #bfb th:first-child{min-width:30px;max-width:40px;width:40px}
+#bob td:nth-child(2), #bfb td:nth-child(2),
+#bob th:nth-child(2), #bfb th:nth-child(2){min-width:160px;max-width:220px}
 </style>
 </head>
 <body>
@@ -225,7 +237,16 @@ tr.drg{opacity:.3;background:rgba(196,150,22,.08)!important}
           </div>
           <div class="sp"><h3>Zapisz do bazy dań</h3>
           <div><label style="color:rgba(255,255,255,.7)">Nazwa dania</label>
-          <input type="text" id="sn" placeholder="np. Chrupiąca Kiwi-zja…" oninput="checkExisting()"></div>
+          <div style="position:relative">
+          <input type="text" id="sn" placeholder="np. Chrupiąca Kiwi-zja…"
+            oninput="checkExisting();showDanieAC()"
+            onblur="setTimeout(()=>hideDanieAC(),200)"
+            autocomplete="off">
+          <div id="danie-ac" style="display:none;position:absolute;top:100%;left:0;right:0;
+            background:var(--s2);border:1.5px solid var(--ac);border-top:none;
+            border-radius:0 0 7px 7px;z-index:300;max-height:180px;overflow-y:auto;
+            box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+        </div></div>
           <div id="existing-info" style="display:none;margin:6px 0;padding:6px 10px;background:rgba(255,200,0,.15);border-radius:6px;border:1px solid rgba(255,200,0,.3);font-size:.78rem;color:#f5c842">
             ⚠ Danie o tej nazwie już istnieje — zostanie nadpisane
           </div>
@@ -253,7 +274,17 @@ tr.drg{opacity:.3;background:rgba(196,150,22,.08)!important}
             <div><label>Stawka godzinowa (zł/h)</label><input type="number" id="fs" value="23" oninput="rFC()"></div>
             <div><label>Czas produkcji (min)</label><input type="number" id="fc2" value="5" oninput="rFC()"></div>
             <div><label>Liczba sztuk</label><input type="number" id="fst" value="1" min="1" oninput="rFC()"></div>
-            <div><label>Marża (%)</label><input type="number" id="fm" value="30" oninput="rFC()"></div>
+            <div>
+              <label>Cena sprzedaży (zł) <span style="font-size:.72rem;color:var(--ac)">★ stała — wpisz raz</span></label>
+              <input type="number" id="fc-cena-target" step="0.01" placeholder="np. 15"
+                oninput="rFC()" style="border-color:rgba(237,179,19,.5);border-width:2px;font-weight:700;font-size:1rem">
+            </div>
+            <div>
+              <label>Marża (%) <span style="font-size:.72rem;color:var(--mu)">— wylicza się automatycznie</span></label>
+              <input type="number" id="fm" step="0.01" readonly
+                style="background:var(--s3);color:var(--ac);font-weight:700;cursor:default;border-color:var(--bo)"
+                placeholder="— wyliczana —">
+            </div>
           </div></div>
           <div class="fcs"><h3>🚨 Alert maksymalnej ceny wytworzenia</h3><div class="g2">
             <div><label>Maksymalna cena wytworzenia (zł/szt)</label>
@@ -275,7 +306,7 @@ tr.drg{opacity:.3;background:rgba(196,150,22,.08)!important}
             <span>💶 Sugerowana cena sprzedaży</span><span class="sv" style="color:var(--re);font-size:1.2rem" id="frce">0,00 zł</span>
           </div>
           <div style="margin-top:10px;padding:10px 0;border-top:1px solid var(--bo)">
-            <div style="font-size:.78rem;color:var(--mu);margin-bottom:6px">Zaproponuj marżę do równej ceny:</div>
+            <div style="font-size:.78rem;color:var(--mu);margin-bottom:6px">Wybierz cenę sprzedaży (marża wyliczy się sama):</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap" id="marza-suggestions"></div>
           </div>
         </div></div>
@@ -283,26 +314,36 @@ tr.drg{opacity:.3;background:rgba(196,150,22,.08)!important}
     </div>
     <div class="tab" id="tab-baza-odz">
       <p class="pt">Baza Wartości Odżywczych</p>
-      <p class="ps">Aktualizuje się automatycznie przy zmianach produktów. Przeciągnij danie na folder lub wybierz z listy.</p>
+      <p class="ps">Aktualizuje się automatycznie gdy zmienisz dane produktów w bazie.</p>
+      <div class="folders-bar" id="folders-odz"></div>
       <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
         <button class="btn bb sm" onclick="ltk('odz')">✏ Wczytaj do kalkulatora</button>
         <button class="btn br sm" onclick="dB('odz')">🗑 Usuń zaznaczone</button>
-        <button class="btn bgh sm" onclick="addFolder('odz')">📁 Nowy folder</button>
         <input type="text" id="search-odz" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBO()">
       </div></div>
-      <div id="folders-odz"></div>
+      <div class="tw"><table><thead><tr>
+        <th style="width:30px"><input type="checkbox" onchange="togB(this,'odz')"></th>
+        <th>Nazwa dania</th><th>Data</th><th>Waga (g)</th>
+        <th>kcal/100g</th><th>Tłuszcze</th><th>Tł.nas.</th><th>Węglowodany</th><th>Cukry</th><th>Białka</th><th>Sól</th>
+        <th>Alergeny</th><th>Może zawierać</th><th>Skład etykieta</th>
+      </tr></thead><tbody id="bob"></tbody></table></div>
     </div>
     <div class="tab" id="tab-baza-fc">
       <p class="pt">Baza Food Cost</p>
-      <p class="ps">🚨 = przekroczony limit ceny. Przeciągnij danie na folder lub wybierz z listy.</p>
+      <p class="ps">🚨 = przekroczony limit ceny. Aktualizuje się przy zmianach cen produktów.</p>
+      <div class="folders-bar" id="folders-fc"></div>
       <div class="sh"><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
         <button class="btn bb sm" onclick="ltk('fc')">✏ Wczytaj do kalkulatora</button>
         <button class="btn br sm" onclick="dB('fc')">🗑 Usuń zaznaczone</button>
-        <button class="btn bgh sm" onclick="addFolder('fc')">📁 Nowy folder</button>
         <input type="text" id="search-fc" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBF()">
         <span style="font-size:.78rem;color:var(--mu)">Alert → zakładka Food Cost</span>
       </div></div>
-      <div id="folders-fc"></div>
+      <div class="tw"><table><thead><tr>
+        <th style="width:30px"><input type="checkbox" onchange="togB(this,'fc')"></th>
+        <th>Nazwa dania</th><th>Data</th><th>Waga (g)</th>
+        <th>Koszt skł.</th><th>Koszt opak.</th><th>Robocizna</th><th>Koszt wytw.</th><th>Alert</th>
+        <th>Cena sprzed.</th><th>Marża</th><th>Sztuki</th><th>Skład etykieta</th>
+      </tr></thead><tbody id="bfb"></tbody></table></div>
     </div>
       <!-- XML IMPORT TAB -->
     <div class="tab" id="tab-xml-import">
@@ -386,6 +427,13 @@ tr.drg{opacity:.3;background:rgba(196,150,22,.08)!important}
 </div>
 <div class="nf" id="nf"></div>
 <script>
+/*
+JEDNORAZOWO — wklej w Supabase SQL Editor i kliknij Run:
+
+ALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT '';
+ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT '';
+*/
+
 // ══ KONFIGURACJA SUPABASE — wpisz swoje dane ══
 const SU='https://mxprgfubfdozlrtemsgi.supabase.co';
 const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cHJnZnViZmRvemxydGVtc2dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzEwMDAsImV4cCI6MjA5NDIwNzAwMH0.pVHzoZrUt5w4yMJ4x0jFkyAof52QvM6al8aXKWfgENE';
@@ -408,7 +456,11 @@ async function init(){
     document.getElementById('dot').className='dot ok';
     document.getElementById('clb').textContent='połączono ✓';
     document.getElementById('lo').style.display='none';
-    renP();iK();
+    renP();iK();renderFolders('odz');renderFolders('fc');
+    // Jednorazowe przypomnienie o SQL dla kolumny kategoria
+    if(!localStorage.getItem('sql_kategoria_done')){
+      console.info('💡 Aby używać folderów, wklej w Supabase SQL Editor:\nALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';\nALTER TABLE baza_fc ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';');
+    }
   }catch(e){
     document.getElementById('dot').className='dot er';
     document.getElementById('clb').textContent='błąd';
@@ -532,29 +584,42 @@ function rFC(){
   const rb=st*cz/60/sz,wt=t.ko+op+rb,lc=wt*sz,ce=ma<100?wt/(1-ma/100):0;
   const s=(id,v)=>document.getElementById(id).textContent=v;
   s('frsk',zl(t.ko));s('frop',zl(op));s('frrb',zl(rb));s('frwt',zl(wt));s('frlc',zl(lc)+` (${sz} szt)`);s('frce',zl(ce));
-  // Sugestie marży do równych cen
+  // Sugestie marży — równe ceny w zł
   const sugEl=document.getElementById('marza-suggestions');
   if(sugEl && wt>0){
     const suggestions=[];
-    // Generuj równe ceny od wt*1.1 do wt*3, szukaj okrągłych
-    for(let mult=1.1;mult<=3.5;mult+=0.05){
-      const cenaProba=wt*mult;
-      const rounded=Math.ceil(cenaProba); // zaokrąglij w górę do pełnego złotego
-      if(rounded>0 && !suggestions.find(s=>s.cena===rounded)){
-        const marzaProba=((rounded-wt)/rounded*100).toFixed(0);
-        if(marzaProba>=10 && suggestions.length<5){
-          suggestions.push({cena:rounded, marza:marzaProba});
+    const minCena=Math.ceil(wt*1.05); // minimum 5% marży
+    // Generuj 6 kolejnych równych cen od minCena
+    let cena=minCena;
+    while(suggestions.length<6){
+      const marza=((cena-wt)/cena*100);
+      if(marza>=5) suggestions.push({cena, marza:Math.round(marza)});
+      cena++;
+    }
+    // Sprawdź czy jest ustawiona cena docelowa — zaznacz ją
+    const cenaTarget=parseFloat(document.getElementById('fc-cena-target')?.value)||0;
+    sugEl.innerHTML=suggestions.map(s=>{
+      const active=s.cena===cenaTarget;
+      return `<button onclick="setSuggestedMarza(${s.cena})"
+        style="background:${active?'var(--ac)':'rgba(237,179,19,.15)'};
+               border:1px solid ${active?'var(--ac)':'rgba(237,179,19,.3)'};
+               color:${active?'#1a1a1a':'var(--ac)'};border-radius:6px;padding:5px 10px;cursor:pointer;
+               font-size:.78rem;font-weight:600;font-family:'DM Sans',sans-serif;transition:.15s">
+        ${s.cena} zł <span style="opacity:.7">(${s.marza}%)</span>
+      </button>`;
+    }).join('');
+    // Auto-update marży jeśli jest ustawiona cena docelowa
+    if(cenaTarget>0){
+      const newMarza=((cenaTarget-wt)/cenaTarget*100);
+      if(newMarza>0&&newMarza<100){
+        const fmEl=document.getElementById('fm');
+        if(fmEl&&Math.abs(parseFloat(fmEl.value)-newMarza)>0.1){
+          fmEl.value=newMarza.toFixed(2);
+          // Zaktualizuj wyświetlane wartości
+          document.getElementById('fc-r-cena').textContent=zl(cenaTarget);
         }
       }
     }
-    sugEl.innerHTML=suggestions.map(s=>
-      `<button onclick="setSuggestedMarza(${s.marza})"
-        style="background:rgba(196,150,22,.15);border:1px solid rgba(196,150,22,.3);
-               color:var(--ac);border-radius:6px;padding:5px 10px;cursor:pointer;
-               font-size:.78rem;font-weight:600;font-family:'DM Sans',sans-serif">
-        ${s.cena} zł <span style="opacity:.7">(${s.marza}%)</span>
-      </button>`
-    ).join('');
   }
   const ae=document.getElementById('as');
   if(al>0){
@@ -571,6 +636,62 @@ function checkExisting(){
   infoEl.style.display=(existsOdz||existsFC)?'block':'none';
 }
 
+function showDanieAC(){
+  const q=(document.getElementById('sn').value||'').toLowerCase().trim();
+  const ac=document.getElementById('danie-ac');
+  if(!ac)return;
+  if(!q){ac.style.display='none';return;}
+  // Zbierz unikalne nazwy z obu baz z oznaczeniem bazy
+  const candidates=[];
+  const seen=new Set();
+  BO.forEach(d=>{
+    if(d.nazwa.toLowerCase().includes(q)&&!seen.has(d.nazwa.toLowerCase())){
+      seen.add(d.nazwa.toLowerCase());
+      candidates.push({nazwa:d.nazwa,baza:'🥗 Wartości Odżywcze'});
+    }
+  });
+  BF.forEach(d=>{
+    const key=d.nazwa.toLowerCase();
+    if(d.nazwa.toLowerCase().includes(q)){
+      const ex=candidates.find(c=>c.nazwa.toLowerCase()===key);
+      if(ex) ex.baza='🥗+📊 Obie bazy';
+      else if(!seen.has(key)){
+        seen.add(key);
+        candidates.push({nazwa:d.nazwa,baza:'📊 Food Cost'});
+      }
+    }
+  });
+  if(!candidates.length){ac.style.display='none';return;}
+  ac.innerHTML=candidates.slice(0,8).map(c=>`
+    <div onclick="pickDanieAC('${c.nazwa.replace(/'/g,"\'")}','${c.baza}')"
+      style="padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;
+             align-items:center;border-bottom:1px solid var(--bo)"
+      onmouseover="this.style.background='var(--s3)'"
+      onmouseout="this.style.background=''">
+      <span style="font-size:.85rem;color:var(--tx);font-weight:500">${c.nazwa}</span>
+      <span style="font-size:.72rem;color:var(--ac);margin-left:8px;white-space:nowrap">${c.baza}</span>
+    </div>`).join('');
+  ac.style.display='block';
+}
+
+function pickDanieAC(nazwa, baza){
+  const el=document.getElementById('sn');
+  if(el) el.value=nazwa;
+  hideDanieAC();
+  checkExisting();
+  // Pokaż info z której bazy
+  const infoEl=document.getElementById('existing-info');
+  if(infoEl){
+    infoEl.style.display='block';
+    infoEl.textContent=`⚠ Danie już istnieje w: ${baza} — zostanie nadpisane`;
+  }
+}
+
+function hideDanieAC(){
+  const ac=document.getElementById('danie-ac');
+  if(ac) ac.style.display='none';
+}
+
 async function sav(tg){
   const nz=document.getElementById('sn').value.trim();if(!nz){alert('Podaj nazwę dania!');return;}
   const{t,us}=gKD();if(!us.length){alert('Dodaj składniki z wagami!');return;}
@@ -580,9 +701,11 @@ async function sav(tg){
   const st=parseFloat(document.getElementById('fs')?.value)||35;
   const cz=parseFloat(document.getElementById('fc2')?.value)||0;
   const sz=Math.max(1,parseInt(document.getElementById('fst')?.value)||1);
-  const ma=parseFloat(document.getElementById('fm')?.value)||0;
   const al=parseFloat(document.getElementById('fa')?.value)||0;
-  const rb=st*cz/60/sz,wt=t.ko+op+rb,ce=ma<100?wt/(1-ma/100):0;
+  const cenaTarget=parseFloat(document.getElementById('fc-cena-target')?.value)||0;
+  const rb=st*cz/60/sz, wt=t.ko+op+rb;
+  const ce=cenaTarget>0?cenaTarget:0;
+  const ma=ce>0&&wt>0?((ce-wt)/ce*100):0;
   const aS=new Set(),mS=new Set();
   us.forEach(({p})=>{
     (p.alergeny||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>aS.add(a));
@@ -604,7 +727,7 @@ async function sav(tg){
     }
   }
   if(tg==='fc'||tg==='both'){
-    const e={nazwa:nz,data:td,waga_g:t.wg,koszt_sk:t.ko,koszt_opak:op,koszt_rob:rb,koszt_wytw:wt,cena_sp:ce,marza:ma,sztuki:sz,sklad_etykieta:sk,skladniki:skl,fc_params:{opak:op,stawka:st,czas:cz,sztuki:sz,marza:ma},alert_cena:al};
+    const e={nazwa:nz,data:td,waga_g:t.wg,koszt_sk:t.ko,koszt_opak:op,koszt_rob:rb,koszt_wytw:wt,cena_sp:ce,marza:ma,sztuki:sz,sklad_etykieta:sk,skladniki:skl,fc_params:{opak:op,stawka:st,czas:cz,sztuki:sz,marza:ma,cena_target:ce},alert_cena:al};
     const existIdx=BF.findIndex(d=>d.nazwa.toLowerCase()===nz.toLowerCase());
     if(overwrite && existIdx>=0){
       await dbU('baza_fc',BF[existIdx].id,e);
@@ -633,57 +756,42 @@ async function rcB(){
     const u={waga_g:r.t.wg,kcal100:r.t.kc/r.wg*100,tl100:r.t.tl/r.wg*100,tlnas100:r.t.tn/r.wg*100,weg100:r.t.we/r.wg*100,cukry100:r.t.cu/r.wg*100,bialka100:r.t.bi/r.wg*100,sol100:r.t.so/r.wg*100,sklad_etykieta:r.sk};
     Object.assign(d,u);await dbU('baza_odz',d.id,u);}
   for(const d of BF){const r=calc(d);if(!r)continue;
-    const fc=d.fc_params||{};const rb=(fc.stawka||35)*(fc.czas||0)/60/Math.max(1,fc.sztuki||1);
-    const wt=r.t.ko+(fc.opak||0)+rb,ce=(fc.marza||0)<100?wt/(1-(fc.marza||0)/100):0;
-    const u={koszt_sk:r.t.ko,koszt_rob:rb,koszt_wytw:wt,cena_sp:ce,sklad_etykieta:r.sk};
+    const fc=d.fc_params||{};
+    const rb=(fc.stawka||23)*(fc.czas||5)/60/Math.max(1,fc.sztuki||1);
+    const wt=r.t.ko+(fc.opak||0)+rb;
+    // Cena sprzedaży STAŁA — pobierz z fc_params lub z zapisanej cena_sp
+    const cenaStala=fc.cena_target||d.cena_sp||0;
+    // Marża się zmienia żeby pokazać jak drożeją składniki
+    const nowaMarza=cenaStala>0&&wt>0?((cenaStala-wt)/cenaStala*100):0;
+    const u={koszt_sk:r.t.ko,koszt_rob:rb,koszt_wytw:wt,cena_sp:cenaStala,marza:nowaMarza,sklad_etykieta:r.sk};
     Object.assign(d,u);await dbU('baza_fc',d.id,u);}
 }
 function renBO(){
   const q=(document.getElementById('search-odz')?.value||'').toLowerCase();
-  const container=document.getElementById('folders-odz');if(!container)return;
-  const folders=fLoad(),mapping=dfLoad('odz');
-  const filtered=BO.filter(d=>!q||d.nazwa.toLowerCase().includes(q));
-  const HDR=`<thead><tr><th style="width:30px"><input type="checkbox" onchange="togB(this,'odz')"></th><th style="min-width:150px">Nazwa dania</th><th style="min-width:68px">Data</th><th style="min-width:58px">Waga (g)</th><th>kcal/100g</th><th>Tłuszcze</th><th>Tł.nas.</th><th>Węglowodany</th><th>Cukry</th><th>Białka</th><th>Sól</th><th style="min-width:110px">Alergeny</th><th style="min-width:110px">Może zawierać</th><th style="min-width:200px">Skład etykieta</th><th style="min-width:100px">Folder</th></tr></thead>`;
-  const allF=folders.odz||[];
-  function row(d,i){
-    const fOpts=`<option value="">Bez folderu</option>${allF.map(f=>`<option value="${f.replace(/"/g,'&quot;')}"${mapping[d.id]===f?' selected':''}>${f}</option>`).join('')}`;
-    return`<tr draggable="true" ondragstart="dragStart(event,'odz','${d.id}')" ondragend="dragEnd(event)" style="${i%2?'background:var(--s2)':''}"><td><input type="checkbox" class="boc" data-id="${d.id}"></td><td style="font-weight:600">${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td>${nf(d.waga_g,0)}</td><td>${nf(d.kcal100,1)}</td><td>${nf(d.tl100)}</td><td>${nf(d.tlnas100)}</td><td>${nf(d.weg100)}</td><td>${nf(d.cukry100)}</td><td>${nf(d.bialka100)}</td><td>${nf(d.sol100,3)}</td><td style="font-size:.77rem;color:var(--red)">${d.alergeny||'—'}</td><td style="font-size:.77rem;color:var(--gold)">${d.moze_zawierac||'—'}</td><td style="font-size:.77rem;max-width:220px"><div style="max-height:44px;overflow:hidden" id="skod${d.id}"><span style="white-space:normal">${d.sklad_etykieta||'—'}</span></div>${d.sklad_etykieta&&d.sklad_etykieta.length>60?`<button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`:''}</td><td><select class="sel" style="width:90px;font-size:.74rem" onchange="setDishFolder('odz','${d.id}',this.value||null)">${fOpts}</select></td></tr>`;
-  }
-  const groups={};allF.forEach(f=>groups[f]=[]);groups['']=[];
-  filtered.forEach(d=>{const f=mapping[d.id];if(f&&allF.includes(f))groups[f].push(d);else groups[''].push(d);});
-  let html='';
-  allF.forEach((fn,fi)=>{
-    const dishes=groups[fn]||[],eid=`odz-f${fi}`,esc=fn.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    html+=`<div class="fs"><div class="fh" onclick="togFold('${eid}')" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOn(event,'odz','${esc}')"><span class="ftog" id="ftog-${eid}">▼</span>📁 ${fn}<span class="fct">${dishes.length}</span><button onclick="event.stopPropagation();delFolder('odz','${esc}')" style="margin-left:4px;background:none;border:none;color:var(--mu);cursor:pointer;font-size:.82rem;padding:2px 5px;border-radius:4px" title="Usuń folder">✕</button></div><div class="fbd open" id="fbd-${eid}">${dishes.length?`<div class="tw"><table>${HDR}<tbody>${dishes.map((d,i)=>row(d,i)).join('')}</tbody></table></div>`:'<div style="padding:12px 16px;color:var(--mu);font-size:.82rem;font-style:italic;border:2px dashed var(--bo);margin:8px;border-radius:6px;text-align:center">Przeciągnij dania tutaj</div>'}</div></div>`;
-  });
-  const noDishes=groups['']||[],nEid='odz-fnone';
-  html+=`<div class="fs"><div class="fh" onclick="togFold('${nEid}')" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOn(event,'odz',null)"><span class="ftog" id="ftog-${nEid}">▼</span>📄 Bez folderu<span class="fct">${noDishes.length}</span></div><div class="fbd open" id="fbd-${nEid}">${noDishes.length?`<div class="tw"><table>${HDR}<tbody>${noDishes.map((d,i)=>row(d,i)).join('')}</tbody></table></div>`:'<div style="padding:12px 16px;color:var(--mu);font-size:.82rem;font-style:italic;text-align:center">Wszystkie dania są w folderach ✓</div>'}</div></div>`;
-  container.innerHTML=html;
+  const tb=document.getElementById('bob');tb.innerHTML='';
+  BO.filter(d=>!q||d.nazwa.toLowerCase().includes(q)).forEach((d,i)=>{tb.innerHTML+=`<tr style="${i%2?'background:var(--s2)':'background:var(--s)'}"><td><input type="checkbox" class="boc" data-id="${d.id}"></td><td style="font-weight:600;color:var(--tx)">${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td style='color:var(--tx)'>${nf(d.waga_g,0)}</td><td style='color:var(--tx)'>${nf(d.kcal100,1)}</td><td>${nf(d.tl100)}</td><td>${nf(d.tlnas100)}</td><td>${nf(d.weg100)}</td><td>${nf(d.cukry100)}</td><td>${nf(d.bialka100)}</td><td>${nf(d.sol100,3)}</td><td style="font-size:.77rem;color:var(--red)">${d.alergeny||'—'}</td><td style="font-size:.77rem;color:var(--gold)">${d.moze_zawierac||'—'}</td><td style="font-size:.77rem;max-width:220px">
+        <div style="max-height:44px;overflow:hidden;position:relative" id="skod${d.id}">
+          <span style="white-space:normal">${d.sklad_etykieta||'—'}</span>
+        </div>
+        ${d.sklad_etykieta&&d.sklad_etykieta.length>60?`<button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`:''}
+      </td></tr>`;});
 }
 function renBF(){
   const q=(document.getElementById('search-fc')?.value||'').toLowerCase();
-  const container=document.getElementById('folders-fc');if(!container)return;
-  const folders=fLoad(),mapping=dfLoad('fc');
-  const filtered=BF.filter(d=>!q||d.nazwa.toLowerCase().includes(q));
-  const HDR=`<thead><tr><th style="width:30px"><input type="checkbox" onchange="togB(this,'fc')"></th><th style="min-width:150px">Nazwa dania</th><th style="min-width:68px">Data</th><th style="min-width:58px">Waga (g)</th><th>Koszt skł.</th><th>Koszt opak.</th><th>Robocizna</th><th>Koszt wytw.</th><th>Alert</th><th>Cena sprzed.</th><th>Marża</th><th>Sztuki</th><th style="min-width:200px">Skład etykieta</th><th style="min-width:100px">Folder</th></tr></thead>`;
-  const allF=folders.fc||[];
-  function row(d,i){
+  const tb=document.getElementById('bfb');tb.innerHTML='';
+  BF.filter(d=>!q||d.nazwa.toLowerCase().includes(q)).forEach((d,i)=>{
     const ov=d.alert_cena>0&&d.koszt_wytw>d.alert_cena;
-    const bg=ov?'background:rgba(248,113,113,.08)':(i%2?'background:var(--s2)':'');
+    const bg=ov?'background:rgba(248,113,113,.08)':i%2?'background:var(--s2)':'background:var(--s)';
     const badge=ov?`<span class="ab">🚨 max ${zl(d.alert_cena)}</span>`:(d.alert_cena>0?'<span style="color:#2E7D32;font-size:.78rem">✅ OK</span>':'<span style="color:var(--mu);font-size:.75rem">—</span>');
-    const fOpts=`<option value="">Bez folderu</option>${allF.map(f=>`<option value="${f.replace(/"/g,'&quot;')}"${mapping[d.id]===f?' selected':''}>${f}</option>`).join('')}`;
-    return`<tr draggable="true" ondragstart="dragStart(event,'fc','${d.id}')" ondragend="dragEnd(event)" style="${bg}"><td><input type="checkbox" class="bfc" data-id="${d.id}"></td><td style="font-weight:600;color:${ov?'var(--red)':'inherit'}">${ov?'🚨 ':''}${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td>${nf(d.waga_g,0)}</td><td>${zl(d.koszt_sk)}</td><td>${zl(d.koszt_opak)}</td><td>${zl(d.koszt_rob)}</td><td style="font-weight:700;color:${ov?'var(--red)':'var(--ac)'}">${zl(d.koszt_wytw)}</td><td>${badge}</td><td style="font-weight:700;color:var(--red)">${zl(d.cena_sp)}</td><td>${nf(d.marza,0)}%</td><td>${d.sztuki||1}</td><td style="font-size:.77rem;max-width:220px"><div style="max-height:44px;overflow:hidden" id="skfc${d.id}"><span style="white-space:normal">${d.sklad_etykieta||'—'}</span></div>${d.sklad_etykieta&&d.sklad_etykieta.length>60?`<button onclick="togSk('skfc${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`:''}</td><td><select class="sel" style="width:90px;font-size:.74rem" onchange="setDishFolder('fc','${d.id}',this.value||null)">${fOpts}</select></td></tr>`;
-  }
-  const groups={};allF.forEach(f=>groups[f]=[]);groups['']=[];
-  filtered.forEach(d=>{const f=mapping[d.id];if(f&&allF.includes(f))groups[f].push(d);else groups[''].push(d);});
-  let html='';
-  allF.forEach((fn,fi)=>{
-    const dishes=groups[fn]||[],eid=`fc-f${fi}`,esc=fn.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    html+=`<div class="fs"><div class="fh" onclick="togFold('${eid}')" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOn(event,'fc','${esc}')"><span class="ftog" id="ftog-${eid}">▼</span>📁 ${fn}<span class="fct">${dishes.length}</span><button onclick="event.stopPropagation();delFolder('fc','${esc}')" style="margin-left:4px;background:none;border:none;color:var(--mu);cursor:pointer;font-size:.82rem;padding:2px 5px;border-radius:4px" title="Usuń folder">✕</button></div><div class="fbd open" id="fbd-${eid}">${dishes.length?`<div class="tw"><table>${HDR}<tbody>${dishes.map((d,i)=>row(d,i)).join('')}</tbody></table></div>`:'<div style="padding:12px 16px;color:var(--mu);font-size:.82rem;font-style:italic;border:2px dashed var(--bo);margin:8px;border-radius:6px;text-align:center">Przeciągnij dania tutaj</div>'}</div></div>`;
+    tb.innerHTML+=`<tr style="${bg}"><td><input type="checkbox" class="bfc" data-id="${d.id}"></td><td style="font-weight:600;color:${ov?'var(--re)':'inherit'}">${ov?'🚨 ':''} ${d.nazwa}</td><td style="color:var(--mu);font-size:.78rem">${d.data||''}</td><td style='color:var(--tx)'>${nf(d.waga_g,0)}</td><td style='color:var(--tx)'>${zl(d.koszt_sk)}</td><td>${zl(d.koszt_opak)}</td><td>${zl(d.koszt_rob)}</td><td style="font-weight:700;color:${ov?'var(--re)':'var(--ac)'}">${zl(d.koszt_wytw)}</td><td>${badge}</td><td style="font-weight:700;color:var(--red)">${zl(d.cena_sp)}</td><td style="font-weight:700;color:${
+      d.marza>=30?'var(--green)':d.marza>=15?'var(--ac)':d.marza>0?'var(--red)':'var(--mu)'
+    }">${nf(d.marza,1)}%</td><td>${d.sztuki||1}</td><td style="font-size:.77rem;max-width:220px">
+        <div style="max-height:44px;overflow:hidden;position:relative" id="skod${d.id}">
+          <span style="white-space:normal">${d.sklad_etykieta||'—'}</span>
+        </div>
+        ${d.sklad_etykieta&&d.sklad_etykieta.length>60?`<button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`:''}
+      </td></tr>`;
   });
-  const noDishes=groups['']||[],nEid='fc-fnone';
-  html+=`<div class="fs"><div class="fh" onclick="togFold('${nEid}')" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropOn(event,'fc',null)"><span class="ftog" id="ftog-${nEid}">▼</span>📄 Bez folderu<span class="fct">${noDishes.length}</span></div><div class="fbd open" id="fbd-${nEid}">${noDishes.length?`<div class="tw"><table>${HDR}<tbody>${noDishes.map((d,i)=>row(d,i)).join('')}</tbody></table></div>`:'<div style="padding:12px 16px;color:var(--mu);font-size:.82rem;font-style:italic;text-align:center">Wszystkie dania są w folderach ✓</div>'}</div></div>`;
-  container.innerHTML=html;
 }
 function togB(c,t){document.querySelectorAll(`.b${t[0]}c`).forEach(x=>x.checked=c.checked);}
 async function dB(t){
@@ -1214,66 +1322,227 @@ function togSk(id,btn){
   btn.textContent=expanded?'▼ rozwiń':'▲ zwiń';
 }
 
-function setSuggestedMarza(marza){
-  const el=document.getElementById('fm');
-  if(el){ el.value=marza; rFC(); }
+function setSuggestedMarza(cenaTarget){
+  // Ustaw cenę docelową i wylicz marżę
+  const ctEl=document.getElementById('fc-cena-target');
+  if(ctEl){ ctEl.value=cenaTarget; calcMarzaFromCena(); }
 }
 
-// ══ FOLDER SYSTEM ══
-let dragId=null,dragType=null;
+// calcMarzaFromCena zastąpiona przez rFC()
 
-function fLoad(){try{const d=localStorage.getItem('n_folders');return d?JSON.parse(d):{odz:[],fc:[]};}catch(e){return{odz:[],fc:[]};}}
-function fSave(f){try{localStorage.setItem('n_folders',JSON.stringify(f));}catch(e){}}
-function dfLoad(t){try{const d=localStorage.getItem('n_df_'+t);return d?JSON.parse(d):{};}catch(e){return{};}}
-function dfSave(t,m){try{localStorage.setItem('n_df_'+t,JSON.stringify(m));}catch(e){}}
 
-function addFolder(t){
-  const n=prompt('Nazwa nowego folderu (np. Kanapki, Sałatki, Obiady…):');
-  if(!n||!n.trim())return;
-  const f=fLoad();if(!f[t])f[t]=[];
-  if(!f[t].includes(n.trim())){f[t].push(n.trim());fSave(f);}
-  t==='odz'?renBO():renBF();
+// ══════════════════════════════════════════════
+// SYSTEM FOLDERÓW / KATEGORII
+// ══════════════════════════════════════════════
+let activeFolder = {odz: '__all__', fc: '__all__'};
+
+function getFolders(type){
+  const data = type==='odz' ? BO : BF;
+  const cats = new Set(data.map(d=>d.kategoria||'').filter(c=>c));
+  return [...cats].sort();
 }
 
-function delFolder(t,n){
-  if(!confirm(`Usunąć folder "${n}"? Dania wrócą do "Bez folderu".`))return;
-  const f=fLoad();f[t]=(f[t]||[]).filter(x=>x!==n);fSave(f);
-  const m=dfLoad(t);Object.keys(m).forEach(id=>{if(m[id]===n)delete m[id];});dfSave(t,m);
-  t==='odz'?renBO():renBF();
+function renderFolders(type){
+  const el = document.getElementById(`folders-${type}`);
+  if(!el) return;
+  const folders = getFolders(type);
+  const data = type==='odz' ? BO : BF;
+  const active = activeFolder[type];
+
+  const allCount = data.length;
+  const noFolderCount = data.filter(d=>!d.kategoria).length;
+
+  let html2 = `
+    <button class="folder-btn ${active==='__all__'?'active':''}"
+      onclick="setFolder('${type}','__all__')">
+      📋 Wszystkie <span class="cnt-badge">${allCount}</span>
+    </button>`;
+
+  folders.forEach(f=>{
+    const cnt = data.filter(d=>d.kategoria===f).length;
+    const isActive = active===f;
+    html2 += `
+      <div style="position:relative;display:inline-flex;align-items:center;gap:0">
+        <button class="folder-btn ${isActive?'active':''}"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="dropToFolder(event,'${type}','${f.replace(/'/g,"\\'")}',this)"
+          onclick="setFolder('${type}','${f.replace(/'/g,"\\'")}')">
+          📁 ${f} <span class="cnt-badge">${cnt}</span>
+        </button>
+        <button onclick="renameFolder('${type}','${f.replace(/'/g,"\\'")}')"
+          title="Zmień nazwę"
+          style="background:none;border:none;cursor:pointer;color:var(--mu);font-size:.75rem;
+                 padding:2px 4px;margin-left:2px;opacity:.6;transition:.2s"
+          onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">✏</button>
+        <button onclick="deleteFolder('${type}','${f.replace(/'/g,"\\'")}')"
+          title="Usuń folder (dania zostają)"
+          style="background:none;border:none;cursor:pointer;color:var(--mu);font-size:.75rem;
+                 padding:2px 4px;opacity:.6;transition:.2s"
+          onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">✕</button>
+      </div>`;
+  });
+
+  if(noFolderCount>0 && folders.length>0){
+    html2 += `
+      <button class="folder-btn ${active==='__none__'?'active':''}"
+        onclick="setFolder('${type}','__none__')">
+        📂 Bez kategorii <span class="cnt-badge">${noFolderCount}</span>
+      </button>`;
+  }
+
+  html2 += `<button class="folder-new" onclick="newFolder('${type}')">+ Nowy folder</button>`;
+  el.innerHTML = html2;
 }
 
-function setDishFolder(t,id,n){
-  const m=dfLoad(t);
-  if(!n)delete m[id];else m[id]=n;
-  dfSave(t,m);
-  t==='odz'?renBO():renBF();
+function setFolder(type, folder){
+  activeFolder[type] = folder;
+  renderFolders(type);
+  if(type==='odz') renBO();
+  else renBF();
 }
 
-function togFold(eid){
-  const body=document.getElementById('fbd-'+eid);
-  const tog=document.getElementById('ftog-'+eid);
-  if(!body)return;
-  const open=body.classList.toggle('open');
-  if(tog)tog.textContent=open?'▼':'▶';
+async function newFolder(type){
+  const name = prompt('Nazwa nowego folderu (np. Kanapki, Sałatki, Obiady):');
+  if(!name || !name.trim()) return;
+  const trimmed = name.trim();
+  // Folder istnieje gdy jakieś danie ma tę kategorię
+  // Samo tworzenie to tylko dodanie nazwy do UI — dania można przeciągnąć
+  // Dodaj tymczasowy placeholder żeby folder był widoczny
+  const data = type==='odz' ? BO : BF;
+  // Sprawdź czy już istnieje
+  if(data.some(d=>d.kategoria===trimmed)){
+    nt(`Folder "${trimmed}" już istnieje!`); return;
+  }
+  // Zapamiętaj tymczasowo (bez dań folder nie przetrwa odświeżenia)
+  // Dlatego od razu pytamy czy przenieść zaznaczone
+  renderFolders(type);
+  nt(`📁 Folder "${trimmed}" gotowy — przeciągnij dania lub zaznacz i użyj "Przenieś do folderu"`);
+  // Pokaż folder tymczasowo przez dodanie sztucznego wpisu
+  saveTempFolder(type, trimmed);
 }
 
-function dragStart(e,t,id){
-  dragId=id;dragType=t;
-  setTimeout(()=>e.target.classList.add('drg'),0);
-  e.dataTransfer.effectAllowed='move';
-  e.dataTransfer.setData('text/plain',id);
+function saveTempFolder(type, name){
+  try{
+    const key = `temp_folders_${type}`;
+    const existing = JSON.parse(localStorage.getItem(key)||'[]');
+    if(!existing.includes(name)) existing.push(name);
+    localStorage.setItem(key, JSON.stringify(existing));
+  }catch(e){}
+  renderFolders(type);
 }
-function dragEnd(e){
-  e.target.classList.remove('drg');
-  document.querySelectorAll('.fh').forEach(h=>h.classList.remove('dov'));
-  dragId=null;dragType=null;
+
+function getTempFolders(type){
+  try{ return JSON.parse(localStorage.getItem(`temp_folders_${type}`)||'[]'); }
+  catch(e){ return []; }
 }
-function dragOver(e){e.preventDefault();e.currentTarget.classList.add('dov');}
-function dragLeave(e){e.currentTarget.classList.remove('dov');}
-function dropOn(e,t,n){
-  e.preventDefault();e.currentTarget.classList.remove('dov');
-  if(!dragId||dragType!==t)return;
-  setDishFolder(t,dragId,n);
+
+function getFolders(type){
+  const data = type==='odz' ? BO : BF;
+  const fromData = new Set(data.map(d=>d.kategoria||'').filter(c=>c));
+  const fromTemp = new Set(getTempFolders(type));
+  return [...new Set([...fromData, ...fromTemp])].sort();
+}
+
+async function dropToFolder(event, type, folderName, btn){
+  btn.classList.remove('drag-over');
+  event.preventDefault();
+  const id = event.dataTransfer.getData('text/plain');
+  if(!id) return;
+  const data = type==='odz' ? BO : BF;
+  const table = type==='odz' ? 'baza_odz' : 'baza_fc';
+  const item = data.find(d=>d.id===id);
+  if(!item) return;
+  const oldKat = item.kategoria || '';
+  if(oldKat===folderName) return;
+  item.kategoria = folderName;
+  await dbU(table, id, {kategoria: folderName});
+  renderFolders(type);
+  if(type==='odz') renBO(); else renBF();
+  nt(`📁 "${item.nazwa}" → ${folderName}`);
+}
+
+async function renameFolder(type, oldName){
+  const newName = prompt(`Zmień nazwę folderu "${oldName}":`, oldName);
+  if(!newName || !newName.trim() || newName.trim()===oldName) return;
+  const trimmed = newName.trim();
+  const data = type==='odz' ? BO : BF;
+  const table = type==='odz' ? 'baza_odz' : 'baza_fc';
+  const toUpdate = data.filter(d=>d.kategoria===oldName);
+  for(const d of toUpdate){
+    d.kategoria = trimmed;
+    await dbU(table, d.id, {kategoria: trimmed});
+  }
+  // Aktualizuj temp folders
+  try{
+    const key=`temp_folders_${type}`;
+    const tf=JSON.parse(localStorage.getItem(key)||'[]');
+    const idx=tf.indexOf(oldName);
+    if(idx>=0){tf[idx]=trimmed;localStorage.setItem(key,JSON.stringify(tf));}
+  }catch(e){}
+  if(activeFolder[type]===oldName) activeFolder[type]=trimmed;
+  renderFolders(type);
+  if(type==='odz') renBO(); else renBF();
+  nt(`✏ Folder przemianowany na "${trimmed}"`);
+}
+
+async function deleteFolder(type, name){
+  if(!confirm(`Usunąć folder "${name}"?\n\nDania pozostaną — tylko folder zniknie.`)) return;
+  const data  = type==='odz' ? BO : BF;
+  const table = type==='odz' ? 'baza_odz' : 'baza_fc';
+  const toUpdate = data.filter(d=>d.kategoria===name);
+  for(const d of toUpdate){
+    d.kategoria = '';
+    await dbU(table, d.id, {kategoria:''});
+  }
+  try{
+    const key=`temp_folders_${type}`;
+    const tf=JSON.parse(localStorage.getItem(key)||'[]').filter(f=>f!==name);
+    localStorage.setItem(key,JSON.stringify(tf));
+  }catch(e){}
+  if(activeFolder[type]===name) activeFolder[type]='__all__';
+  renderFolders(type);
+  if(type==='odz') renBO(); else renBF();
+  nt(`🗑 Folder "${name}" usunięty (dania zachowane)`);
+}
+
+// Kontekstowe menu "przenieś do folderu" przy prawym kliku na wierszu
+function showMoveMenu(event, type, id, nazwa){
+  event.preventDefault();
+  document.querySelectorAll('.move-menu').forEach(m=>m.remove());
+  const folders = getFolders(type);
+  if(!folders.length){nt('Brak folderów — najpierw utwórz folder przyciskiem "+ Nowy folder"');return;}
+  const menu = document.createElement('div');
+  menu.className='move-menu';
+  menu.style.cssText=`position:fixed;left:${event.clientX}px;top:${event.clientY}px;
+    background:var(--s2);border:1.5px solid var(--ac);border-radius:8px;
+    z-index:1000;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden`;
+  menu.innerHTML=`
+    <div style="padding:8px 12px;font-size:.75rem;color:var(--mu);border-bottom:1px solid var(--bo)">
+      Przenieś "${nazwa.substring(0,20)}" do:</div>
+    ${folders.map(f=>`
+      <div onclick="moveToFolder('${type}','${id}','${f.replace(/'/g,"\\'")}');this.closest('.move-menu').remove()"
+        style="padding:8px 14px;cursor:pointer;font-size:.84rem;color:var(--tx)"
+        onmouseover="this.style.background='var(--s3)'"
+        onmouseout="this.style.background=''">📁 ${f}</div>`).join('')}
+    <div onclick="moveToFolder('${type}','${id}','');this.closest('.move-menu').remove()"
+      style="padding:8px 14px;cursor:pointer;font-size:.84rem;color:var(--mu);border-top:1px solid var(--bo)"
+      onmouseover="this.style.background='var(--s3)'"
+      onmouseout="this.style.background=''">📂 Bez kategorii</div>`;
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),10);
+}
+
+async function moveToFolder(type, id, folderName){
+  const data  = type==='odz' ? BO : BF;
+  const table = type==='odz' ? 'baza_odz' : 'baza_fc';
+  const item = data.find(d=>d.id===id);
+  if(!item) return;
+  item.kategoria = folderName;
+  await dbU(table, id, {kategoria: folderName});
+  renderFolders(type);
+  if(type==='odz') renBO(); else renBF();
+  nt(`📁 "${item.nazwa}" przeniesione`);
 }
 
 init();
