@@ -128,6 +128,16 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
 .mfoot{padding:12px 22px 16px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--bo);background:var(--s2)}
 .map-row{display:grid;grid-template-columns:180px 30px 220px;align-items:center;gap:8px;margin-bottom:8px;font-size:.85rem}
 
+/* KOSZ */
+.trash-badge{background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.3);
+  color:var(--red);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700}
+.restore-btn{background:rgba(62,207,142,.12);border:1px solid rgba(62,207,142,.3);
+  color:var(--green);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;
+  font-size:.78rem;font-weight:600;font-family:'DM Sans',sans-serif;transition:.15s}
+.restore-btn:hover{background:rgba(62,207,142,.25)}
+.trash-row{opacity:.6}
+.trash-days{font-size:.72rem;color:var(--red)}
+
 /* MODAL POTWIERDZENIA ZAPISU */
 .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;
   display:flex;align-items:center;justify-content:center;padding:20px}
@@ -346,7 +356,8 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
       <div class="folders-bar" id="folders-odz"></div>
       <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
         <button class="btn bb sm" onclick="ltk('odz')">✏ Wczytaj do kalkulatora</button>
-        <button class="btn br sm" onclick="dB('odz')">🗑 Usuń zaznaczone</button>
+        <button class="btn br sm" onclick="dB('odz')">🗑 Do kosza</button>
+        <button class="btn bgh sm" onclick="showTrash('odz')" id="trash-btn-odz">🗑 Kosz (<span id="trash-count-odz">0</span>)</button>
         <input type="text" id="search-odz" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBO()">
       </div></div>
       <div class="tw"><table><thead><tr>
@@ -373,7 +384,8 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
       <div class="folders-bar" id="folders-fc"></div>
       <div class="sh"><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
         <button class="btn bb sm" onclick="ltk('fc')">✏ Wczytaj do kalkulatora</button>
-        <button class="btn br sm" onclick="dB('fc')">🗑 Usuń zaznaczone</button>
+        <button class="btn br sm" onclick="dB('fc')">🗑 Do kosza</button>
+        <button class="btn bgh sm" onclick="showTrash('fc')" id="trash-btn-fc">🗑 Kosz (<span id="trash-count-fc">0</span>)</button>
         <input type="text" id="search-fc" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBF()">
         <span style="font-size:.78rem;color:var(--mu)">Alert → zakładka Food Cost</span>
       </div></div>
@@ -488,6 +500,21 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     </div>
   </div>
 </div>
+<!-- MODAL KOSZA -->
+<div class="confirm-overlay" id="trash-overlay" style="display:none" onclick="if(event.target===this)closeTrash()">
+  <div class="confirm-box" style="max-width:700px">
+    <div class="confirm-hdr">
+      <span class="icon">🗑</span>
+      <h2 id="trash-title">Kosz</h2>
+      <span style="margin-left:auto;font-size:.78rem;color:#1a1a1a;opacity:.7">Dania usunięte w ciągu ostatnich 30 dni</span>
+    </div>
+    <div id="trash-body" style="padding:16px 22px;max-height:400px;overflow-y:auto"></div>
+    <div class="confirm-footer" style="justify-content:space-between">
+      <button class="btn br sm" onclick="emptyTrash()" id="empty-trash-btn">💀 Usuń wszystko na stałe</button>
+      <button class="btn bgh" onclick="closeTrash()">Zamknij</button>
+    </div>
+  </div>
+</div>
 <div class="nf" id="nf"></div>
 <script>
 /*
@@ -495,6 +522,8 @@ JEDNORAZOWO — wklej w Supabase SQL Editor i kliknij Run:
 
 ALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT '';
 ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT '';
+ALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
 */
 
 // ══ KONFIGURACJA SUPABASE — wpisz swoje dane ══
@@ -519,7 +548,7 @@ async function init(){
     document.getElementById('dot').className='dot ok';
     document.getElementById('clb').textContent='połączono ✓';
     document.getElementById('lo').style.display='none';
-    renP();iK();renderFolders('odz');renderFolders('fc');
+    renP();iK();renderFolders('odz');renderFolders('fc');updateTrashCount();autoCleanTrash();
     // Jednorazowe przypomnienie o SQL dla kolumny kategoria
     if(!localStorage.getItem('sql_kategoria_done')){
       console.info('💡 Aby używać folderów, wklej w Supabase SQL Editor:\nALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';\nALTER TABLE baza_fc ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';');
@@ -934,7 +963,7 @@ function renBO(){
   const q  = (document.getElementById('search-odz')?.value||'').toLowerCase();
   const af = activeFolder['odz'];
   const tb = document.getElementById('bob'); tb.innerHTML='';
-  const list = BO.filter(d=>{
+  const list = BO.filter(d=>!d.deleted_at).filter(d=>{
     if(q && !d.nazwa.toLowerCase().includes(q)) return false;
     if(af==='__all__')  return true;
     if(af==='__none__') return !d.kategoria;
@@ -972,7 +1001,7 @@ function renBF(){
   const q  = (document.getElementById('search-fc')?.value||'').toLowerCase();
   const af = activeFolder['fc'];
   const tb = document.getElementById('bfb'); tb.innerHTML='';
-  const list = BF.filter(d=>{
+  const list = BF.filter(d=>!d.deleted_at).filter(d=>{
     if(q && !d.nazwa.toLowerCase().includes(q)) return false;
     if(af==='__all__')  return true;
     if(af==='__none__') return !d.kategoria;
@@ -1016,10 +1045,31 @@ function togB(c,t){document.querySelectorAll(`.b${t[0]}c`).forEach(x=>x.checked=
 async function dB(t){
   const cn=t==='odz'?'boc':'bfc';
   const ids=[...document.querySelectorAll(`.${cn}:checked`)].map(c=>c.dataset.id);
-  if(!ids.length)return;if(!confirm(`Usunąć ${ids.length} wpis(ów)?`))return;
-  await dbD(t==='odz'?'baza_odz':'baza_fc',ids);
-  if(t==='odz'){BO=BO.filter(d=>!ids.includes(d.id));renBO();}else{BF=BF.filter(d=>!ids.includes(d.id));renBF();}
-  nt('🗑 Usunięto');
+  if(!ids.length)return;
+  const names = (t==='odz'?BO:BF).filter(d=>ids.includes(d.id)).map(d=>d.nazwa).join(', ');
+  if(!confirm(`Przenieść do kosza (${ids.length})?
+
+${names}
+
+Możesz je przywrócić w ciągu 30 dni.`))return;
+
+  const now = new Date().toISOString();
+  const table = t==='odz'?'baza_odz':'baza_fc';
+
+  // Soft delete — ustaw deleted_at zamiast usuwać
+  for(const id of ids){
+    await dbU(table, id, {deleted_at: now});
+  }
+
+  if(t==='odz'){
+    BO = BO.map(d=>ids.includes(d.id)?{...d,deleted_at:now}:d);
+    renBO();
+  } else {
+    BF = BF.map(d=>ids.includes(d.id)?{...d,deleted_at:now}:d);
+    renBF();
+  }
+  updateTrashCount();
+  nt(`🗑 Przeniesiono do kosza (${ids.length})`);
 }
 function ltk(t){
   const cn=t==='odz'?'boc':'bfc';
@@ -1539,6 +1589,120 @@ function togSk(id,btn){
   const expanded=el.style.maxHeight==='none';
   el.style.maxHeight=expanded?'44px':'none';
   btn.textContent=expanded?'▼ rozwiń':'▲ zwiń';
+}
+
+// ══ KOSZ ══
+function updateTrashCount(){
+  const trashOdz = BO.filter(d=>d.deleted_at).length;
+  const trashFC  = BF.filter(d=>d.deleted_at).length;
+  const elO = document.getElementById('trash-count-odz');
+  const elF = document.getElementById('trash-count-fc');
+  if(elO) elO.textContent = trashOdz;
+  if(elF) elF.textContent = trashFC;
+  // Pokoloruj gdy jest coś w koszu
+  const btnO = document.getElementById('trash-btn-odz');
+  const btnF = document.getElementById('trash-btn-fc');
+  if(btnO) btnO.style.color = trashOdz>0?'var(--red)':'var(--mu)';
+  if(btnF) btnF.style.color = trashFC>0?'var(--red)':'var(--mu)';
+}
+
+function daysAgo(dateStr){
+  if(!dateStr) return 0;
+  return Math.floor((Date.now()-new Date(dateStr).getTime())/(1000*60*60*24));
+}
+
+function showTrash(type){
+  const data = type==='odz'?BO:BF;
+  const trashed = data.filter(d=>d.deleted_at).sort((a,b)=>new Date(b.deleted_at)-new Date(a.deleted_at));
+  document.getElementById('trash-title').textContent = `Kosz — ${type==='odz'?'Wartości Odżywcze':'Food Cost'}`;
+  document.getElementById('empty-trash-btn').dataset.type = type;
+
+  if(!trashed.length){
+    document.getElementById('trash-body').innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--mu)">
+        <div style="font-size:2.5rem;margin-bottom:10px">🗑</div>
+        <div style="font-size:.9rem">Kosz jest pusty</div>
+      </div>`;
+  } else {
+    let rows = `<div style="font-size:.78rem;color:var(--mu);margin-bottom:12px">
+      Kliknij <strong style="color:var(--green)">Przywróć</strong> żeby odzyskać danie. Po 30 dniach usuwane automatycznie.</div>`;
+    trashed.forEach(d=>{
+      const days = daysAgo(d.deleted_at);
+      const daysLeft = 30-days;
+      rows += `<div style="display:flex;justify-content:space-between;align-items:center;
+        padding:10px 0;border-bottom:1px solid var(--bo);gap:12px">
+        <div style="flex:1">
+          <div style="font-weight:600;color:var(--tx);font-size:.88rem">${d.nazwa}</div>
+          <div class="trash-days">usunięto ${days===0?'dziś':days===1?'wczoraj':days+' dni temu'} — pozostało ${daysLeft} dni</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="restore-btn" onclick="restoreItem('${type}','${d.id}')">↩ Przywróć</button>
+          <button onclick="permDelete('${type}','${d.id}')"
+            style="background:none;border:none;color:var(--mu);cursor:pointer;font-size:.78rem;padding:4px 8px"
+            title="Usuń na stałe">✕</button>
+        </div>
+      </div>`;
+    });
+    document.getElementById('trash-body').innerHTML = rows;
+  }
+  document.getElementById('trash-overlay').style.display='flex';
+}
+
+function closeTrash(){
+  document.getElementById('trash-overlay').style.display='none';
+}
+
+async function restoreItem(type, id){
+  const table = type==='odz'?'baza_odz':'baza_fc';
+  await dbU(table, id, {deleted_at: null});
+  if(type==='odz'){
+    const d=BO.find(x=>x.id===id); if(d) d.deleted_at=null;
+    renBO();
+  } else {
+    const d=BF.find(x=>x.id===id); if(d) d.deleted_at=null;
+    renBF();
+  }
+  updateTrashCount();
+  showTrash(type); // odśwież modal
+  nt(`✅ Danie przywrócone!`);
+}
+
+async function permDelete(type, id){
+  if(!confirm('Usunąć NA STAŁE? Tego nie można cofnąć.')) return;
+  const table = type==='odz'?'baza_odz':'baza_fc';
+  await dbD(table,[id]);
+  if(type==='odz') BO=BO.filter(d=>d.id!==id);
+  else             BF=BF.filter(d=>d.id!==id);
+  updateTrashCount();
+  showTrash(type);
+  nt('🗑 Usunięto na stałe');
+}
+
+async function emptyTrash(){
+  const type = document.getElementById('empty-trash-btn').dataset.type||'odz';
+  const data = type==='odz'?BO:BF;
+  const trashed = data.filter(d=>d.deleted_at);
+  if(!trashed.length) return;
+  if(!confirm(`Usunąć NA STAŁE wszystkie ${trashed.length} dania z kosza?
+Tego nie można cofnąć.`)) return;
+  const table = type==='odz'?'baza_odz':'baza_fc';
+  await dbD(table, trashed.map(d=>d.id));
+  if(type==='odz') BO=BO.filter(d=>!d.deleted_at);
+  else             BF=BF.filter(d=>!d.deleted_at);
+  updateTrashCount();
+  closeTrash();
+  nt('🗑 Kosz opróżniony');
+}
+
+// Automatycznie czyść starsze niż 30 dni przy starcie
+async function autoCleanTrash(){
+  const threshold = new Date(Date.now()-30*24*60*60*1000).toISOString();
+  const oldOdz = BO.filter(d=>d.deleted_at && d.deleted_at < threshold);
+  const oldFC  = BF.filter(d=>d.deleted_at && d.deleted_at < threshold);
+  for(const d of oldOdz){ await dbD('baza_odz',[d.id]); }
+  for(const d of oldFC){  await dbD('baza_fc', [d.id]); }
+  if(oldOdz.length) BO=BO.filter(d=>!(d.deleted_at&&d.deleted_at<threshold));
+  if(oldFC.length)  BF=BF.filter(d=>!(d.deleted_at&&d.deleted_at<threshold));
 }
 
 function setSuggestedMarza(cenaTarget){
