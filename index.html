@@ -63,6 +63,7 @@ tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
 tbody tr:hover{background:var(--s2)}
 tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
 .ci{border:none!important;background:transparent!important;padding:2px 4px;font-size:.83rem;width:100%;min-width:40px;border-radius:4px;color:var(--tx)}
+.ci-upper{text-transform:uppercase}
 .ci:focus{outline:2px solid var(--ac)!important;background:var(--s2)!important}
 .sel{border:1px solid var(--bo)!important;background:var(--s2)!important;padding:3px 4px;font-size:.8rem;width:68px;border-radius:4px;color:var(--tx)}
 
@@ -596,7 +597,7 @@ function renP(){
     const g=c1g(p);let c=`<td><input type="checkbox" class="ck" data-id="${p.id}"></td>`;
     PFD.forEach(f=>{
       if(f.t==='sl'){const o=f.o.map(x=>`<option${x===p[f.k]?' selected':''}>${x}</option>`).join('');c+=`<td><select class="ci sel" style="width:${f.w}px" onchange="upP('${p.id}','${f.k}',this.value)">${o}</select></td>`;}
-      else{c+=`<td><input class="ci" type="${f.t==='nm'?'number':'text'}" value="${p[f.k]??''}" style="width:${f.w}px" step="${f.t==='nm'?'0.001':''}" onchange="upP('${p.id}','${f.k}',this.value)"></td>`;}
+      else{const isUpper=f.k==='pelny_sklad';c+=`<td><input class="ci${isUpper?' ci-upper':''}" type="${f.t==='nm'?'number':'text'}" value="${p[f.k]??''}" style="width:${f.w}px;${isUpper?'text-transform:uppercase':''}" step="${f.t==='nm'?'0.001':''}" onchange="upP('${p.id}','${f.k}',isUpper?this.value.toUpperCase():this.value)"></td>`;}
     });
     c+=`<td style="color:var(--green);font-weight:600;font-size:.8rem;white-space:nowrap" id="g${p.id}">${g?g.toFixed(4)+' zł':'—'}</td>`;
     const tr=document.createElement('tr');tr.dataset.id=p.id;tr.innerHTML=c;tb.appendChild(tr);
@@ -605,7 +606,7 @@ function renP(){
 let uT={};
 function upP(id,f,v){
   const p=PR.find(x=>x.id===id);if(!p)return;
-  p[f]=NF.includes(f)?(parseFloat(v)||0):v;
+  p[f]=NF.includes(f)?(parseFloat(v)||0):(f==='pelny_sklad'?v.toUpperCase():v);
   const e=document.getElementById('g'+id);const g=c1g(p);if(e)e.textContent=g?g.toFixed(4)+' zł':'—';
   clearTimeout(uT[id]);
   uT[id]=setTimeout(async()=>{await dbU('produkty',id,{[f]:p[f]});await rcB();nt('💾 Zapisano');},800);
@@ -655,7 +656,7 @@ function rc(){
   s('pw',nf(t.we/wg*100)+' g');s('pcu',nf(t.cu/wg*100)+' g');s('pbi',nf(t.bi/wg*100)+' g');
   s('pso',nf(t.so/wg*100,3)+' g');s('pko',zl(t.ko));
   const sr=[...us].sort((a,b)=>b.w-a.w);
-  document.getElementById('st').textContent=sr.map(({p})=>{const sk=p.pelny_sklad||'';return sk&&sk!=='0'?`${p.nazwa} [${sk}]`:p.nazwa;}).join(', ')||'—';
+  document.getElementById('st').textContent=sr.map(({p})=>{const sk=(p.pelny_sklad||'').toUpperCase();return sk&&sk!=='0'?`${p.nazwa} [${sk}]`:p.nazwa;}).join(', ')||'—';
   const aS=new Set(),mS=new Set();
   sr.forEach(({p})=>{
     (p.alergeny||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>aS.add(a));
@@ -905,7 +906,7 @@ async function doSave(tg, nz, overwrite){
     (p.moze_zawierac||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>mS.add(a));
   });
   const sr=[...us].sort((a,b)=>b.w-a.w);
-  const sk=sr.map(({p})=>{const s=p.pelny_sklad||'';return s&&s!=='0'?`${p.nazwa} [${s}]`:p.nazwa;}).join(', ');
+  const sk=sr.map(({p})=>{const s=(p.pelny_sklad||'').toUpperCase();return s&&s!=='0'?`${p.nazwa} [${s}]`:p.nazwa;}).join(', ');
   const skl=sr.map(({p,w})=>({nazwa:p.nazwa,waga:w}));
   const td=new Date().toLocaleDateString('pl-PL');
   if(tg==='odz'||tg==='both'){
@@ -1211,7 +1212,7 @@ async function importCSV(){
     mapped.forEach(([i,f])=>{
       const v=(row[i]||'').trim();
       if(NF.includes(f)) prod[f]=parseFloat(v.replace(',','.'))||0;
-      else prod[f]=v;
+      else prod[f]=f==='pelny_sklad'?v.toUpperCase():v;
     });
     if(!prod.nazwa) prod.nazwa=`Import ${ri+1}`;
     toInsert.push(prod);
