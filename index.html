@@ -529,7 +529,7 @@ ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NUL
 
 // ══ KONFIGURACJA SUPABASE — wpisz swoje dane ══
 const SU='https://mxprgfubfdozlrtemsgi.supabase.co';
-const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cHJnZnViZmRvemxydGVtc2dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzEwMDAsImV4cCI6MjA5NDIwNzAwMH0.pVHzoZrUt5w4yMJ4x0jFkyAof52QvM6al8aXKWfgENE';
+const SK='sb_publishable_suOrtH8Cl-Zo4vc7LMOdzg_nUqUlema';
 
 const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK,'Access-Control-Allow-Origin':'*'};
 async function dbG(t){const r=await fetch(`${SU}/rest/v1/${t}?order=id`,{method:'GET',headers:H,mode:'cors'});return r.ok?r.json():[];}
