@@ -221,7 +221,8 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
       <p class="ps">Kliknij w komórkę żeby edytować. Zmiany zapisują się automatycznie — widoczne na każdym urządzeniu.</p>
       <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap">
         <button class="btn bg" onclick="addP()">+ Nowy produkt</button>
-        <button class="btn br sm" onclick="delSel()">🗑 Usuń zaznaczone</button>
+        <button class="btn br sm" onclick="delSel()">🗑 Do kosza</button>
+        <button class="btn bgh sm" onclick="showTrash('prod')" id="trash-btn-prod">🗑 Kosz (<span id="trash-count-prod">0</span>)</button>
         <button class="btn" onclick="document.getElementById('csv-inp').click()" style="background:rgba(255,217,26,.2);color:var(--ac);border:1px solid rgba(255,217,26,.4)">📂 Importuj CSV</button>
         <button class="btn" onclick="exportCSV()" style="background:rgba(91,155,213,.2);color:#5B9BD5;border:1px solid rgba(91,155,213,.4)">📤 Eksportuj CSV</button>
         <input type="file" id="csv-inp" accept=".csv" style="display:none" onchange="loadCSV(this)">
@@ -525,6 +526,7 @@ ALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT '';
 ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT '';
 ALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
 ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE produkty ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
 */
 
 // ══ KONFIGURACJA SUPABASE — wpisz swoje dane ══
@@ -643,7 +645,7 @@ async function addP(){
 }
 function renP(){
   const q=(document.getElementById('sp')?.value||'').toLowerCase();
-  const list=PR.filter(p=>!q||p.nazwa.toLowerCase().includes(q)||(p.firma||'').toLowerCase().includes(q));
+  const list=PR.filter(p=>!p.deleted_at).filter(p=>!q||p.nazwa.toLowerCase().includes(q)||(p.firma||'').toLowerCase().includes(q));
   const tb=document.getElementById('pb');tb.innerHTML='';
   list.forEach(p=>{
     const g=c1g(p);let c=`<td><input type="checkbox" class="ck" data-id="${p.id}"></td>`;
@@ -677,8 +679,19 @@ function upP(id,f,v){
 function togA(c){document.querySelectorAll('.ck').forEach(x=>x.checked=c.checked);}
 async function delSel(){
   const ids=[...document.querySelectorAll('.ck:checked')].map(c=>c.dataset.id);
-  if(!ids.length)return;if(!confirm(`Usunąć ${ids.length} produkt(ów)?`))return;
-  await dbD('produkty',ids);PR=PR.filter(p=>!ids.includes(p.id));renP();nt('🗑 Usunięto');
+  if(!ids.length)return;
+  const names=PR.filter(p=>ids.includes(p.id)).map(p=>p.nazwa).join(', ');
+  if(!confirm(`Przenieść do kosza (${ids.length})?
+
+${names}
+
+Możesz je przywrócić w ciągu 30 dni.`))return;
+  const now=new Date().toISOString();
+  for(const id of ids) await dbU('produkty',id,{deleted_at:now});
+  PR=PR.map(p=>ids.includes(p.id)?{...p,deleted_at:now}:p);
+  renP();
+  updateTrashCount();
+  nt(`🗑 Przeniesiono do kosza (${ids.length})`);
 }
 
 let kR=[];
@@ -1689,15 +1702,19 @@ function togSk(id,btn){
 
 // ══ KOSZ ══
 function updateTrashCount(){
-  const trashOdz = BO.filter(d=>d.deleted_at).length;
-  const trashFC  = BF.filter(d=>d.deleted_at).length;
+  const trashProd = PR.filter(d=>d.deleted_at).length;
+  const trashOdz  = BO.filter(d=>d.deleted_at).length;
+  const trashFC   = BF.filter(d=>d.deleted_at).length;
+  const elP = document.getElementById('trash-count-prod');
   const elO = document.getElementById('trash-count-odz');
   const elF = document.getElementById('trash-count-fc');
+  if(elP) elP.textContent = trashProd;
   if(elO) elO.textContent = trashOdz;
   if(elF) elF.textContent = trashFC;
-  // Pokoloruj gdy jest coś w koszu
+  const btnP = document.getElementById('trash-btn-prod');
   const btnO = document.getElementById('trash-btn-odz');
   const btnF = document.getElementById('trash-btn-fc');
+  if(btnP) btnP.style.color = trashProd>0?'var(--red)':'var(--mu)';
   if(btnO) btnO.style.color = trashOdz>0?'var(--red)':'var(--mu)';
   if(btnF) btnF.style.color = trashFC>0?'var(--red)':'var(--mu)';
 }
@@ -1708,9 +1725,9 @@ function daysAgo(dateStr){
 }
 
 function showTrash(type){
-  const data = type==='odz'?BO:BF;
+  const data = type==='prod'?PR:type==='odz'?BO:BF;
   const trashed = data.filter(d=>d.deleted_at).sort((a,b)=>new Date(b.deleted_at)-new Date(a.deleted_at));
-  document.getElementById('trash-title').textContent = `Kosz — ${type==='odz'?'Wartości Odżywcze':'Food Cost'}`;
+  document.getElementById('trash-title').textContent = `Kosz — ${type==='prod'?'Baza Produktów':type==='odz'?'Wartości Odżywcze':'Food Cost'}`;
   document.getElementById('empty-trash-btn').dataset.type = type;
 
   if(!trashed.length){
@@ -1728,7 +1745,7 @@ function showTrash(type){
       rows += `<div style="display:flex;justify-content:space-between;align-items:center;
         padding:10px 0;border-bottom:1px solid var(--bo);gap:12px">
         <div style="flex:1">
-          <div style="font-weight:600;color:var(--tx);font-size:.88rem">${d.nazwa}</div>
+          <div style="font-weight:600;color:var(--tx);font-size:.88rem">${d.nazwa||d.nazwa}</div>
           <div class="trash-days">usunięto ${days===0?'dziś':days===1?'wczoraj':days+' dni temu'} — pozostało ${daysLeft} dni</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
@@ -1765,10 +1782,11 @@ async function restoreItem(type, id){
 
 async function permDelete(type, id){
   if(!confirm('Usunąć NA STAŁE? Tego nie można cofnąć.')) return;
-  const table = type==='odz'?'baza_odz':'baza_fc';
+  const table = type==='prod'?'produkty':type==='odz'?'baza_odz':'baza_fc';
   await dbD(table,[id]);
-  if(type==='odz') BO=BO.filter(d=>d.id!==id);
-  else             BF=BF.filter(d=>d.id!==id);
+  if(type==='prod')      PR=PR.filter(d=>d.id!==id);
+  else if(type==='odz')  BO=BO.filter(d=>d.id!==id);
+  else                   BF=BF.filter(d=>d.id!==id);
   updateTrashCount();
   showTrash(type);
   nt('🗑 Usunięto na stałe');
@@ -1783,8 +1801,9 @@ async function emptyTrash(){
 Tego nie można cofnąć.`)) return;
   const table = type==='odz'?'baza_odz':'baza_fc';
   await dbD(table, trashed.map(d=>d.id));
-  if(type==='odz') BO=BO.filter(d=>!d.deleted_at);
-  else             BF=BF.filter(d=>!d.deleted_at);
+  if(type==='prod')     PR=PR.filter(d=>!d.deleted_at);
+  else if(type==='odz') BO=BO.filter(d=>!d.deleted_at);
+  else                  BF=BF.filter(d=>!d.deleted_at);
   updateTrashCount();
   closeTrash();
   nt('🗑 Kosz opróżniony');
@@ -1793,12 +1812,15 @@ Tego nie można cofnąć.`)) return;
 // Automatycznie czyść starsze niż 30 dni przy starcie
 async function autoCleanTrash(){
   const threshold = new Date(Date.now()-30*24*60*60*1000).toISOString();
+  const oldProd= PR.filter(d=>d.deleted_at && d.deleted_at < threshold);
   const oldOdz = BO.filter(d=>d.deleted_at && d.deleted_at < threshold);
   const oldFC  = BF.filter(d=>d.deleted_at && d.deleted_at < threshold);
-  for(const d of oldOdz){ await dbD('baza_odz',[d.id]); }
-  for(const d of oldFC){  await dbD('baza_fc', [d.id]); }
-  if(oldOdz.length) BO=BO.filter(d=>!(d.deleted_at&&d.deleted_at<threshold));
-  if(oldFC.length)  BF=BF.filter(d=>!(d.deleted_at&&d.deleted_at<threshold));
+  for(const d of oldProd){ await dbD('produkty', [d.id]); }
+  for(const d of oldOdz){  await dbD('baza_odz', [d.id]); }
+  for(const d of oldFC){   await dbD('baza_fc',  [d.id]); }
+  if(oldProd.length) PR=PR.filter(d=>!(d.deleted_at&&d.deleted_at<threshold));
+  if(oldOdz.length)  BO=BO.filter(d=>!(d.deleted_at&&d.deleted_at<threshold));
+  if(oldFC.length)   BF=BF.filter(d=>!(d.deleted_at&&d.deleted_at<threshold));
 }
 
 function setSuggestedMarza(cenaTarget){
