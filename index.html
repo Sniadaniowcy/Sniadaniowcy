@@ -732,14 +732,31 @@ function rc(){
 function rFC(){
   const{t}=gKD();
   const op=parseFloat(document.getElementById('fo')?.value)||0;
-  const st=parseFloat(document.getElementById('fs')?.value)||35;
-  const cz=parseFloat(document.getElementById('fc2')?.value)||0;
+  const st=parseFloat(document.getElementById('fs')?.value)||23;
+  const cz=parseFloat(document.getElementById('fc2')?.value)||5;
   const sz=Math.max(1,parseInt(document.getElementById('fst')?.value)||1);
-  const ma=parseFloat(document.getElementById('fm')?.value)||0;
   const al=parseFloat(document.getElementById('fa')?.value)||0;
-  const rb=st*cz/60/sz,wt=t.ko+op+rb,lc=wt*sz,ce=ma<100?wt/(1-ma/100):0;
+  const rb=st*cz/60/sz, wt=t.ko+op+rb, lc=wt*sz;
+
+  // Cena STAŁA — zawsze z pola fc-cena-target
+  const cenaRaw=parseFloat(document.getElementById('fc-cena-target')?.value)||0;
+  const ce=Math.round(cenaRaw*100)/100; // zaokrąglij do groszy
+
+  // Marża WYLICZANA z ceny i kosztu — nie odwrotnie
+  let ma=0;
+  if(ce>0&&wt>0) ma=(ce-wt)/ce*100;
+
+  // Aktualizuj pole marży (readonly)
+  const fmEl=document.getElementById('fm');
+  if(fmEl){
+    fmEl.value=ma>0?ma.toFixed(2):'';
+    fmEl.style.color=ma>=30?'var(--green)':ma>=15?'var(--ac)':ma>0?'var(--red)':'var(--mu)';
+  }
+
   const s=(id,v)=>document.getElementById(id).textContent=v;
-  s('frsk',zl(t.ko));s('frop',zl(op));s('frrb',zl(rb));s('frwt',zl(wt));s('frlc',zl(lc)+` (${sz} szt)`);s('frce',zl(ce));
+  s('frsk',zl(t.ko));s('frop',zl(op));s('frrb',zl(rb));s('frwt',zl(wt));
+  s('frlc',zl(lc)+` (${sz} szt)`);
+  s('frce',ce>0?zl(ce):'— ustaw cenę sprzedaży');
   // Sugestie marży — równe ceny w zł
   const sugEl=document.getElementById('marza-suggestions');
   if(sugEl && wt>0){
@@ -961,7 +978,8 @@ async function doSave(tg, nz, overwrite){
   const al=parseFloat(document.getElementById('fa')?.value)||0;
   const cenaTarget=parseFloat(document.getElementById('fc-cena-target')?.value)||0;
   const rb=st*cz/60/sz, wt=t.ko+op+rb;
-  const ce=cenaTarget>0?cenaTarget:0;
+  // Zaokrąglij cenę do 2 miejsc - eliminuje błędy float (11.02 zamiast 11)
+  const ce=cenaTarget>0?Math.round(cenaTarget*100)/100:0;
   const ma=ce>0&&wt>0?((ce-wt)/ce*100):0;
   const aS=new Set(),mS=new Set();
   us.forEach(({p})=>{
@@ -1016,9 +1034,11 @@ async function rcB(){
     const fc=d.fc_params||{};
     const rb=(fc.stawka||23)*(fc.czas||5)/60/Math.max(1,fc.sztuki||1);
     const wt=r.t.ko+(fc.opak||0)+rb;
-    // Cena sprzedaży STAŁA — pobierz z fc_params lub z zapisanej cena_sp
-    const cenaStala=fc.cena_target||d.cena_sp||0;
-    // Marża się zmienia żeby pokazać jak drożeją składniki
+    // Cena sprzedaży STAŁA — zawsze z fc_params.cena_target lub cena_sp
+    // Zaokrąglij do groszy
+    const cenaStalaRaw=fc.cena_target||d.cena_sp||0;
+    const cenaStala=Math.round(cenaStalaRaw*100)/100;
+    // Marża się zmienia — pokazuje jak koszty wpływają na zysk
     const nowaMarza=cenaStala>0&&wt>0?((cenaStala-wt)/cenaStala*100):0;
     const u={koszt_sk:r.t.ko,koszt_rob:rb,koszt_wytw:wt,cena_sp:cenaStala,marza:nowaMarza,sklad_etykieta:r.sk};
     Object.assign(d,u);await dbU('baza_fc',d.id,u);}
@@ -1148,9 +1168,21 @@ function ltk(t){
     if(inp){inp.value=sk.nazwa;kR[i].n=sk.nazwa;}if(winp){winp.value=sk.waga;kR[i].w=sk.waga;}
   });
   if(t==='fc'&&d.fc_params){const fc=d.fc_params;
-    document.getElementById('fo').value=fc.opak||0;document.getElementById('fs').value=fc.stawka||35;
-    document.getElementById('fc2').value=fc.czas||30;document.getElementById('fst').value=fc.sztuki||1;
-    document.getElementById('fm').value=fc.marza||30;if(d.alert_cena)document.getElementById('fa').value=d.alert_cena;
+    document.getElementById('fo').value=fc.opak||0;
+    document.getElementById('fs').value=fc.stawka||23;
+    document.getElementById('fc2').value=fc.czas||5;
+    document.getElementById('fst').value=fc.sztuki||1;
+    if(d.alert_cena)document.getElementById('fa').value=d.alert_cena;
+    // KLUCZOWE: przywróć stałą cenę sprzedaży
+    const ctEl=document.getElementById('fc-cena-target');
+    if(ctEl){
+      // Priorytet: cena_target z fc_params, potem cena_sp z dania
+      const savedCena = fc.cena_target || d.cena_sp || 0;
+      ctEl.value = savedCena > 0 ? savedCena : '';
+    }
+    // Marża readonly - zostaw pusta, rFC() wyliczy ją z ceny
+    const fmEl=document.getElementById('fm');
+    if(fmEl) fmEl.value='';
   }
   rc();
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
