@@ -531,13 +531,34 @@ ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NUL
 const SU='https://mxprgfubfdozlrtemsgi.supabase.co';
 const SK='sb_publishable_suOrtH8Cl-Zo4vc7LMOdzg_nUqUlema';
 
-const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK,'Access-Control-Allow-Origin':'*'};
-async function dbG(t){const r=await fetch(`${SU}/rest/v1/${t}?order=id`,{method:'GET',headers:H,mode:'cors'});return r.ok?r.json():[];}
+const H={
+  'Content-Type':'application/json',
+  'apikey':SK,
+  'Authorization':'Bearer '+SK,
+};
+if(SK.startsWith('sb_')){
+  H['x-api-key']=SK;
+  delete H['apikey'];
+  delete H['Authorization'];
+}
+
+async function dbG(t){
+  let all=[],offset=0;
+  while(true){
+    const r=await fetch(`${SU}/rest/v1/${t}?order=id&limit=1000&offset=${offset}`,{method:'GET',headers:H,mode:'cors'});
+    if(!r.ok)break;
+    const page=await r.json();
+    if(!Array.isArray(page)||!page.length)break;
+    all=[...all,...page];
+    if(page.length<1000)break;
+    offset+=1000;
+  }
+  return all;
+}
 async function dbU(t,id,d){await fetch(`${SU}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:H,mode:'cors',body:JSON.stringify(d)});}
 async function dbD(t,ids){for(const id of ids)await fetch(`${SU}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H,mode:'cors'});}
 async function ins(t,d){const r=await fetch(`${SU}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},mode:'cors',body:JSON.stringify(d)});return r.ok?r.json():null;}
 
-let PR=[],BO=[],BF=[];
 
 async function init(){
   if(SU.includes('WPISZ')){
