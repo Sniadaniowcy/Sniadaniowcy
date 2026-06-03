@@ -531,13 +531,46 @@ ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NUL
 const SU='https://mxprgfubfdozlrtemsgi.supabase.co';
 const SK='sb_publishable_suOrtH8Cl-Zo4vc7LMOdzg_nUqUlema';
 
-const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK,'Access-Control-Allow-Origin':'*'};
-async function dbG(t){const r=await fetch(`${SU}/rest/v1/${t}?order=id`,{method:'GET',headers:H,mode:'cors'});return r.ok?r.json():[];}
-async function dbU(t,id,d){await fetch(`${SU}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:H,mode:'cors',body:JSON.stringify(d)});}
+// Supabase nowy format kluczy (od Nov 2025)
+// publishable key używa tylko nagłówka Authorization
+const H={
+  'Content-Type':'application/json',
+  'Authorization':'Bearer '+SK,
+};
+
+async function dbG(t){
+  let all=[],offset=0;
+  try{
+    while(true){
+      const r=await fetch(
+        `${SU}/rest/v1/${t}?order=id&limit=1000&offset=${offset}`,
+        {method:'GET',headers:H,mode:'cors'}
+      );
+      if(!r.ok){
+        const errText=await r.text().catch(()=>'');
+        console.error(`dbG ${t} błąd ${r.status}:`,errText);
+        // KRYTYCZNE: nie zwracaj [] - zwróć null żeby wywołujący wiedział o błędzie
+        return null;
+      }
+      const page=await r.json();
+      if(!Array.isArray(page)||!page.length)break;
+      all=[...all,...page];
+      if(page.length<1000)break;
+      offset+=1000;
+    }
+  }catch(e){
+    console.error(`dbG ${t} wyjątek:`,e);
+    return null; // null = błąd, nie [] = puste
+  }
+  return all;
+}
+async function dbU(t,id,d){
+  const r=await fetch(`${SU}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:H,mode:'cors',body:JSON.stringify(d)});
+  if(!r.ok){const e=await r.text().catch(()=>'');console.error(`dbU ${t} ${r.status}:`,e);throw new Error(`Błąd zapisu (${r.status})`);}
+}
 async function dbD(t,ids){for(const id of ids)await fetch(`${SU}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H,mode:'cors'});}
 async function ins(t,d){const r=await fetch(`${SU}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},mode:'cors',body:JSON.stringify(d)});return r.ok?r.json():null;}
 
-let PR=[],BO=[],BF=[];
 
 async function init(){
   if(SU.includes('WPISZ')){
@@ -545,7 +578,27 @@ async function init(){
     return;
   }
   try{
-    [PR,BO,BF]=await Promise.all([dbG('produkty'),dbG('baza_odz'),dbG('baza_fc')]);
+    const [resPR,resBO,resBF]=await Promise.all([dbG('produkty'),dbG('baza_odz'),dbG('baza_fc')]);
+    // Nie nadpisuj danych jeśli Supabase zwróciło błąd (null)
+    if(resPR!==null) PR=resPR;
+    if(resBO!==null) BO=resBO;
+    if(resBF!==null) BF=resBF;
+    if(resPR===null||resBO===null||resBF===null){
+      document.getElementById('dot').className='dot er';
+      document.getElementById('clb').textContent='błąd ładowania';
+      const failed=[resPR===null?'produkty':'',resBO===null?'baza_odz':'',resBF===null?'baza_fc':''].filter(Boolean);
+      console.error('Błąd ładowania tabel:',failed);
+      // Pokaż błąd ale nie blokuj - może część danych się załadowała
+      if(resPR===null){
+        document.getElementById('lo').innerHTML=`<div style="text-align:center;padding:24px;max-width:420px">
+          <div style="font-size:2rem;margin-bottom:10px">⚠️</div>
+          <div style="font-family:'DM Serif Display',serif;font-size:1.1rem;color:#edb313;margin-bottom:8px">Błąd połączenia z bazą</div>
+          <div style="font-size:.84rem;color:#888;line-height:1.6;margin-bottom:16px">Nie udało się załadować produktów. Sprawdź połączenie z internetem i odśwież stronę.</div>
+          <button onclick="location.reload()" style="background:#edb313;border:none;border-radius:7px;padding:10px 20px;font-weight:700;cursor:pointer">🔄 Odśwież stronę</button>
+        </div>`;
+        return;
+      }
+    }
     document.getElementById('dot').className='dot ok';
     document.getElementById('clb').textContent='połączono ✓';
     document.getElementById('lo').style.display='none';
@@ -609,7 +662,18 @@ function upP(id,f,v){
   p[f]=NF.includes(f)?(parseFloat(v)||0):(f==='pelny_sklad'?v.toUpperCase():v);
   const e=document.getElementById('g'+id);const g=c1g(p);if(e)e.textContent=g?g.toFixed(4)+' zł':'—';
   clearTimeout(uT[id]);
-  uT[id]=setTimeout(async()=>{await dbU('produkty',id,{[f]:p[f]});await rcB();nt('💾 Zapisano');},800);
+  uT[id]=setTimeout(async()=>{
+    try{
+      await dbU('produkty',id,{[f]:p[f]});
+      nt('💾 Zapisano');
+      // Przelicz bazy dań z opóźnieniem - nie blokuj UI
+      clearTimeout(window._rcBTimer);
+      window._rcBTimer=setTimeout(()=>rcB(),2000);
+    }catch(e){
+      console.error('Błąd zapisu produktu:',e);
+      nt('❌ Błąd zapisu - sprawdź połączenie');
+    }
+  },1000);
 }
 function togA(c){document.querySelectorAll('.ck').forEach(x=>x.checked=c.checked);}
 async function delSel(){
