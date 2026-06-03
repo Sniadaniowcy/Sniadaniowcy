@@ -531,10 +531,9 @@ ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NUL
 const SU='https://mxprgfubfdozlrtemsgi.supabase.co';
 const SK='sb_publishable_suOrtH8Cl-Zo4vc7LMOdzg_nUqUlema';
 
-// Supabase nowy format kluczy (od Nov 2025)
-// publishable key używa tylko nagłówka Authorization
 const H={
   'Content-Type':'application/json',
+  'apikey':SK,
   'Authorization':'Bearer '+SK,
 };
 
