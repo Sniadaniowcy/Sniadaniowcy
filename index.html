@@ -1027,35 +1027,74 @@ async function doSave(tg, nz, overwrite){
   nt(`✅ "${nz}" zapisane!`);
 }
 async function rcB(){
-  const pd={};PR.forEach(p=>pd[p.nazwa]=p);
+  const pd={};
+  PR.filter(p=>!p.deleted_at).forEach(p=>pd[p.nazwa]=p);
+
   function calc(d){
     if(!d.skladniki||!d.skladniki.length)return null;
     let t={wg:0,kc:0,tl:0,tn:0,we:0,cu:0,bi:0,so:0,ko:0};const us=[];
-    d.skladniki.forEach(sk=>{const p=pd[sk.nazwa];if(!p)return;const w=sk.waga;
+    d.skladniki.forEach(sk=>{
+      const p=pd[sk.nazwa];if(!p)return;const w=sk.waga;
       t.wg+=w;t.kc+=(parseFloat(p.kcal)||0)*w/100;t.tl+=(parseFloat(p.tluszcze)||0)*w/100;
       t.tn+=(parseFloat(p.tluszcze_nas)||0)*w/100;t.we+=(parseFloat(p.weglowodany)||0)*w/100;
       t.cu+=(parseFloat(p.cukry)||0)*w/100;t.bi+=(parseFloat(p.bialka)||0)*w/100;
       t.so+=(parseFloat(p.sole)||0)*w/100;t.ko+=c1g(p)*w;us.push({p,w});
     });
-    const wg=t.wg||1;const sk=[...us].sort((a,b)=>b.w-a.w).map(({p})=>{const s=p.pelny_sklad||'';return s&&s!=='0'?`${p.nazwa} [${s}]`:p.nazwa;}).join(', ');
+    const wg=t.wg||1;
+    const sk=[...us].sort((a,b)=>b.w-a.w).map(({p})=>{
+      const s=(p.pelny_sklad||'').toUpperCase();
+      return s&&s!=='0'?`${p.nazwa} [${s}]`:p.nazwa;
+    }).join(', ');
     return{t,wg,sk};
   }
-  for(const d of BO){const r=calc(d);if(!r)continue;
-    const u={waga_g:r.t.wg,kcal100:r.t.kc/r.wg*100,tl100:r.t.tl/r.wg*100,tlnas100:r.t.tn/r.wg*100,weg100:r.t.we/r.wg*100,cukry100:r.t.cu/r.wg*100,bialka100:r.t.bi/r.wg*100,sol100:r.t.so/r.wg*100,sklad_etykieta:r.sk};
-    Object.assign(d,u);await dbU('baza_odz',d.id,u);}
-  for(const d of BF){const r=calc(d);if(!r)continue;
+
+  // Przelicz wszystkie ODZ lokalnie
+  const odzRows=[];
+  for(const d of BO.filter(x=>!x.deleted_at)){
+    const r=calc(d);if(!r)continue;
+    const u={id:d.id,waga_g:r.t.wg,kcal100:r.t.kc/r.wg*100,tl100:r.t.tl/r.wg*100,
+      tlnas100:r.t.tn/r.wg*100,weg100:r.t.we/r.wg*100,cukry100:r.t.cu/r.wg*100,
+      bialka100:r.t.bi/r.wg*100,sol100:r.t.so/r.wg*100,sklad_etykieta:r.sk};
+    Object.assign(d,u);
+    odzRows.push(u);
+  }
+
+  // Przelicz wszystkie FC lokalnie
+  const fcRows=[];
+  for(const d of BF.filter(x=>!x.deleted_at)){
+    const r=calc(d);if(!r)continue;
     const fc=d.fc_params||{};
     const rb=(fc.stawka||23)*(fc.czas||5)/60/Math.max(1,fc.sztuki||1);
     const wt=r.t.ko+(fc.opak||0)+rb;
-    // Cena sprzedaży STAŁA — zawsze z fc_params.cena_target lub cena_sp
-    // Zaokrąglij do groszy
-    const cenaStalaRaw=fc.cena_target||d.cena_sp||0;
-    const cenaStala=Math.round(cenaStalaRaw*100)/100;
-    // Marża się zmienia — pokazuje jak koszty wpływają na zysk
+    const cenaStala=Math.round((fc.cena_target||d.cena_sp||0)*100)/100;
     const nowaMarza=cenaStala>0&&wt>0?((cenaStala-wt)/cenaStala*100):0;
-    const u={koszt_sk:r.t.ko,koszt_rob:rb,koszt_wytw:wt,cena_sp:cenaStala,marza:nowaMarza,sklad_etykieta:r.sk};
-    Object.assign(d,u);await dbU('baza_fc',d.id,u);}
+    const u={id:d.id,koszt_sk:r.t.ko,koszt_rob:rb,koszt_wytw:wt,
+      cena_sp:cenaStala,marza:nowaMarza,sklad_etykieta:r.sk};
+    Object.assign(d,u);
+    fcRows.push(u);
+  }
+
+  // JEDNO zapytanie batch upsert dla każdej tabeli (zamiast N zapytań)
+  const batchUpsert=async(table,rows)=>{
+    if(!rows.length)return;
+    const r=await fetch(`${SU}/rest/v1/${table}`,{
+      method:'POST',
+      headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},
+      mode:'cors',
+      body:JSON.stringify(rows)
+    });
+    if(!r.ok){
+      const e=await r.text().catch(()=>'');
+      console.error(`rcB batch ${table} błąd ${r.status}:`,e);
+    }
+  };
+
+  await Promise.all([
+    batchUpsert('baza_odz',odzRows),
+    batchUpsert('baza_fc',fcRows)
+  ]);
 }
+
 function renBO(){
   const q  = (document.getElementById('search-odz')?.value||'').toLowerCase();
   const af = activeFolder['odz'];
