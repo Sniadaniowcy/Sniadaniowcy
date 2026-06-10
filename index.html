@@ -659,8 +659,17 @@ async function dbU(t,id,d){
   const r=await fetch(`${SU}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:H,mode:'cors',body:JSON.stringify(d)});
   if(!r.ok){const e=await r.text().catch(()=>'');console.error(`dbU ${t} ${r.status}:`,e);throw new Error(`Błąd zapisu (${r.status})`);}
 }
-async function dbD(t,ids){for(const id of ids)await fetch(`${SU}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H,mode:'cors'});}
-async function ins(t,d){const r=await fetch(`${SU}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},mode:'cors',body:JSON.stringify(d)});return r.ok?r.json():null;}
+async function dbD(t,ids){
+  for(const id of ids){
+    const r=await fetch(`${SU}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H,mode:'cors'});
+    if(!r.ok){const e=await r.text().catch(()=>'');console.error(`dbD ${t} ${r.status}:`,e);throw new Error(`Błąd usuwania (${r.status})`);}
+  }
+}
+async function ins(t,d){
+  const r=await fetch(`${SU}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},mode:'cors',body:JSON.stringify(d)});
+  if(!r.ok){const e=await r.text().catch(()=>'');console.error(`ins ${t} ${r.status}:`,e);return null;}
+  return r.json();
+}
 
 
 async function init(){
@@ -734,6 +743,7 @@ const PFD=[{k:'firma',t:'tx',w:80},{k:'nazwa',t:'tx',w:130},{k:'pelny_sklad',t:'
 async function addP(){
   const r=await ins('produkty',{firma:'',nazwa:'Nowy produkt',pelny_sklad:'',alergeny:'',moze_zawierac:'',kcal:0,tluszcze:0,tluszcze_nas:0,weglowodany:0,cukry:0,bialka:0,sole:0,ilosc_zakupu:1,jednostka:'kg',waga_opak_g:0,cena_zakupu:0});
   if(r&&r[0]){PR.push(r[0]);renP();nt('✅ Dodano produkt');}
+  else nt('❌ Błąd — nie dodano produktu');
 }
 function renP(){
   const q=(document.getElementById('sp')?.value||'').toLowerCase();
@@ -779,11 +789,16 @@ ${names}
 
 Możesz je przywrócić w ciągu 30 dni.`))return;
   const now=new Date().toISOString();
-  for(const id of ids) await dbU('produkty',id,{deleted_at:now});
-  PR=PR.map(p=>ids.includes(p.id)?{...p,deleted_at:now}:p);
-  renP();
-  updateTrashCount();
-  nt(`🗑 Przeniesiono do kosza (${ids.length})`);
+  try{
+    for(const id of ids) await dbU('produkty',id,{deleted_at:now});
+    PR=PR.map(p=>ids.includes(p.id)?{...p,deleted_at:now}:p);
+    renP();
+    updateTrashCount();
+    nt(`🗑 Przeniesiono do kosza (${ids.length})`);
+  }catch(e){
+    console.error('Błąd kosza:',e);
+    nt('❌ Błąd — nie przeniesiono do kosza');
+  }
 }
 
 let kR=[];
@@ -890,18 +905,6 @@ function rFC(){
         ${s.cena} zł <span style="opacity:.7">(${s.marza}%)</span>
       </button>`;
     }).join('');
-    // Auto-update marży jeśli jest ustawiona cena docelowa
-    if(cenaTarget>0){
-      const newMarza=((cenaTarget-wt)/wt*100); // markup
-      if(newMarza>0&&newMarza<100){
-        const fmEl=document.getElementById('fm');
-        if(fmEl&&Math.abs(parseFloat(fmEl.value)-newMarza)>0.1){
-          fmEl.value=newMarza.toFixed(2);
-          // Zaktualizuj wyświetlane wartości
-          document.getElementById('fc-r-cena').textContent=zl(cenaTarget);
-        }
-      }
-    }
   }
   const ae=document.getElementById('as');
   if(al>0){
@@ -980,11 +983,6 @@ function hideDanieAC(){
 // ══════════════════════════════════════════════
 let OP = []; // cache opakowań
 
-async function loadOpak(){
-  const res = await dbG('opakowania');
-  if(res !== null) OP = res;
-}
-
 function renOpak(){
   const q=(document.getElementById('search-opak')?.value||'').toLowerCase();
   const tb=document.getElementById('opak-tbody'); tb.innerHTML='';
@@ -1022,6 +1020,7 @@ async function upOpak(id,field,value){
 async function addOpak(){
   const r=await ins('opakowania',{nazwa:'Nowe opakowanie',opis:'',cena:0,jednostka:'szt'});
   if(r&&r[0]){OP.push(r[0]);renOpak();nt('✅ Dodano opakowanie');}
+  else nt('❌ Błąd — sprawdź czy tabela opakowania istnieje w Supabase');
 }
 
 async function delOpak(){
@@ -1030,9 +1029,14 @@ async function delOpak(){
   const names=OP.filter(o=>ids.includes(o.id)).map(o=>o.nazwa).join(', ');
   if(!confirm(`Przenieść do kosza?\n\n${names}`))return;
   const now=new Date().toISOString();
-  for(const id of ids) await dbU('opakowania',id,{deleted_at:now});
-  OP=OP.map(o=>ids.includes(o.id)?{...o,deleted_at:now}:o);
-  renOpak(); updateTrashCount(); nt('🗑 Przeniesiono do kosza');
+  try{
+    for(const id of ids) await dbU('opakowania',id,{deleted_at:now});
+    OP=OP.map(o=>ids.includes(o.id)?{...o,deleted_at:now}:o);
+    renOpak(); updateTrashCount(); nt('🗑 Przeniesiono do kosza');
+  }catch(e){
+    console.error('Błąd kosza opakowań:',e);
+    nt('❌ Błąd — nie przeniesiono');
+  }
 }
 
 // Autocomplete opakowań w Food Cost
@@ -1204,6 +1208,7 @@ async function confirmSave(){
 async function doSave(tg, nz, overwrite){
   const{t,us}=gKD();
   if(!us.length) return;
+  try{
   const wg=t.wg||1;
   const op=getOpakTotal();
   const opDetails=getOpakDetails();
@@ -1233,7 +1238,9 @@ async function doSave(tg, nz, overwrite){
       Object.assign(BO[existIdx],e);
       nt(`✏ "${nz}" nadpisano w Bazie Wartości Odżywczych!`);
     } else {
-      const r=await ins('baza_odz',e);if(r&&r[0])BO.push(r[0]);
+      const r=await ins('baza_odz',e);
+      if(r&&r[0])BO.push(r[0]);
+      else throw new Error('Zapis do Bazy Wartości Odżywczych nie powiódł się');
     }
   }
   if(tg==='fc'||tg==='both'){
@@ -1243,10 +1250,16 @@ async function doSave(tg, nz, overwrite){
       await dbU('baza_fc',BF[existIdx].id,e);
       Object.assign(BF[existIdx],e);
     } else {
-      const r=await ins('baza_fc',e);if(r&&r[0])BF.push(r[0]);
+      const r=await ins('baza_fc',e);
+      if(r&&r[0])BF.push(r[0]);
+      else throw new Error('Zapis do Bazy Food Cost nie powiódł się');
     }
   }
   nt(`✅ "${nz}" zapisane!`);
+  }catch(e){
+    console.error('Błąd zapisu dania:',e);
+    nt(`❌ NIE ZAPISANO! ${e.message||'Sprawdź połączenie'}`);
+  }
 }
 async function rcB(){
   const pd={};
@@ -1413,21 +1426,23 @@ Możesz je przywrócić w ciągu 30 dni.`))return;
 
   const now = new Date().toISOString();
   const table = t==='odz'?'baza_odz':'baza_fc';
-
-  // Soft delete — ustaw deleted_at zamiast usuwać
-  for(const id of ids){
-    await dbU(table, id, {deleted_at: now});
+  try{
+    for(const id of ids){
+      await dbU(table, id, {deleted_at: now});
+    }
+    if(t==='odz'){
+      BO = BO.map(d=>ids.includes(d.id)?{...d,deleted_at:now}:d);
+      renBO();
+    } else {
+      BF = BF.map(d=>ids.includes(d.id)?{...d,deleted_at:now}:d);
+      renBF();
+    }
+    updateTrashCount();
+    nt(`🗑 Przeniesiono do kosza (${ids.length})`);
+  }catch(e){
+    console.error('Błąd przenoszenia do kosza:',e);
+    nt('❌ Błąd — nie przeniesiono do kosza');
   }
-
-  if(t==='odz'){
-    BO = BO.map(d=>ids.includes(d.id)?{...d,deleted_at:now}:d);
-    renBO();
-  } else {
-    BF = BF.map(d=>ids.includes(d.id)?{...d,deleted_at:now}:d);
-    renBF();
-  }
-  updateTrashCount();
-  nt(`🗑 Przeniesiono do kosza (${ids.length})`);
 }
 function ltk(t){
   const cn=t==='odz'?'boc':'bfc';
@@ -1442,7 +1457,6 @@ function ltk(t){
     if(inp){inp.value=sk.nazwa;kR[i].n=sk.nazwa;}if(winp){winp.value=sk.waga;kR[i].w=sk.waga;}
   });
   if(t==='fc'&&d.fc_params){const fc=d.fc_params;
-    document.getElementById('fo').value=fc.opak||0;
     document.getElementById('fs').value=fc.stawka||23;
     document.getElementById('fc2').value=fc.czas||5;
     document.getElementById('fst').value=fc.sztuki||1;
@@ -2115,12 +2129,6 @@ function setSuggestedMarza(cenaTarget){
 // SYSTEM FOLDERÓW / KATEGORII
 // ══════════════════════════════════════════════
 let activeFolder = {odz: '__all__', fc: '__all__'};
-
-function getFolders(type){
-  const data = type==='odz' ? BO : BF;
-  const cats = new Set(data.map(d=>d.kategoria||'').filter(c=>c));
-  return [...cats].sort();
-}
 
 function renderFolders(type){
   const el = document.getElementById(`folders-${type}`);
