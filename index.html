@@ -694,7 +694,7 @@ async function init(){
     document.getElementById('dot').className='dot ok';
     document.getElementById('clb').textContent='połączono ✓';
     document.getElementById('lo').style.display='none';
-    renP();iK();renderFolders('odz');renderFolders('fc');updateTrashCount();autoCleanTrash();
+    renP();iK();renOpak();renderFolders('odz');renderFolders('fc');updateTrashCount();autoCleanTrash();
     // Jednorazowe przypomnienie o SQL dla kolumny kategoria
     if(!localStorage.getItem('sql_kategoria_done')){
       console.info('💡 Aby używać folderów, wklej w Supabase SQL Editor:\nALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';\nALTER TABLE baza_fc ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';');
@@ -711,6 +711,7 @@ function ST(n,b){
   document.querySelectorAll('.nb').forEach(x=>x.classList.remove('active'));
   document.getElementById('tab-'+n).classList.add('active');
   if(b)b.classList.add('active');
+  if(n==='opakowania')renOpak();
   if(n==='baza-odz')renBO();
   if(n==='baza-fc')renBF();
   if(n==='foodcost')rFC();
