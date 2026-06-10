@@ -1204,7 +1204,8 @@ async function doSave(tg, nz, overwrite){
   const{t,us}=gKD();
   if(!us.length) return;
   const wg=t.wg||1;
-  const op=parseFloat(document.getElementById('fo')?.value)||0;
+  const op=getOpakTotal();
+  const opDetails=getOpakDetails();
   const st=parseFloat(document.getElementById('fs')?.value)||35;
   const cz=parseFloat(document.getElementById('fc2')?.value)||0;
   const sz=Math.max(1,parseInt(document.getElementById('fst')?.value)||1);
