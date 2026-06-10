@@ -2103,9 +2103,8 @@ async function autoCleanTrash(){
 }
 
 function setSuggestedMarza(cenaTarget){
-  // Ustaw cenę docelową i wylicz marżę
   const ctEl=document.getElementById('fc-cena-target');
-  if(ctEl){ ctEl.value=cenaTarget; calcMarzaFromCena(); }
+  if(ctEl){ ctEl.value=cenaTarget; rFC(); }
 }
 
 // calcMarzaFromCena zastąpiona przez rFC()
