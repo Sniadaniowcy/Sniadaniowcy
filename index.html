@@ -231,7 +231,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn br sm" onclick="delSel()">🗑 Do kosza</button>
         <button class="btn bgh sm" onclick="showTrash('prod')" id="trash-btn-prod">🗑 Kosz (<span id="trash-count-prod">0</span>)</button>
         <button class="btn" onclick="document.getElementById('csv-inp').click()" style="background:rgba(255,217,26,.2);color:var(--ac);border:1px solid rgba(255,217,26,.4)">📂 Importuj CSV</button>
-        <button class="btn" onclick="exportCSV()" style="background:rgba(91,155,213,.2);color:#5B9BD5;border:1px solid rgba(91,155,213,.4)">📤 Eksportuj CSV</button>
+        <button class="btn" onclick="exportBase('produkty')" style="background:rgba(91,155,213,.2);color:#5B9BD5;border:1px solid rgba(91,155,213,.4)">📤 Eksportuj CSV</button>
         <input type="file" id="csv-inp" accept=".csv" style="display:none" onchange="loadCSV(this)">
         <input type="text" id="sp" placeholder="🔍 Szukaj…" style="width:180px" oninput="renP()">
       </div></div>
@@ -319,14 +319,14 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
           <button class="btn br sm" onclick="delOpak()">🗑 Do kosza</button>
           <button class="btn bgh sm" onclick="showTrash('opak')" id="trash-btn-opak">🗑 Kosz (<span id="trash-count-opak">0</span>)</button>
           <input type="text" id="search-opak" placeholder="🔍 Szukaj…" style="width:180px" oninput="renOpak()">
+          <button class="btn sm" onclick="exportBase('opakowania')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
         </div>
       </div>
       <div class="tbl-wrap">
         <table>
           <thead><tr>
             <th style="width:30px"><input type="checkbox" id="opak-chk-all" onchange="document.querySelectorAll('.opak-chk').forEach(c=>c.checked=this.checked)"></th>
-            <th style="min-width:180px">Nazwa</th>
-            <th style="min-width:200px">Opis</th>
+            <th style="min-width:220px">Nazwa</th>
             <th style="width:90px">Cena (zł)</th>
             <th style="width:80px">Jednostka</th>
             <th style="width:90px">Cena/szt</th>
@@ -444,6 +444,10 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn br sm" onclick="dB('odz')">🗑 Do kosza</button>
         <button class="btn bgh sm" onclick="showTrash('odz')" id="trash-btn-odz">🗑 Kosz (<span id="trash-count-odz">0</span>)</button>
         <input type="text" id="search-odz" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBO()">
+        <button class="btn sm" onclick="exportBase('baza_odz')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
+        <button class="btn sm" onclick="document.getElementById('imp-odz').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
+        <input type="file" id="imp-odz" accept=".csv" style="display:none" onchange="importBase('baza_odz',this)">
+        <button class="btn sm" onclick="exportODZ()" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
       </div></div>
       <div class="tw"><table><thead><tr>
         <th style="width:30px"><input type="checkbox" onchange="togB(this,'odz')"></th>
@@ -472,7 +476,10 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn br sm" onclick="dB('fc')">🗑 Do kosza</button>
         <button class="btn bgh sm" onclick="showTrash('fc')" id="trash-btn-fc">🗑 Kosz (<span id="trash-count-fc">0</span>)</button>
         <input type="text" id="search-fc" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBF()">
-        <span style="font-size:.78rem;color:var(--mu)">Alert → zakładka Food Cost</span>
+        <button class="btn sm" onclick="exportBase('baza_fc')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
+        <button class="btn sm" onclick="document.getElementById('imp-fc').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
+        <input type="file" id="imp-fc" accept=".csv" style="display:none" onchange="importBase('baza_fc',this)">
+        <button class="btn sm" onclick="exportFC()" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
       </div></div>
       <div class="tw"><table><thead><tr>
         <th style="width:30px"><input type="checkbox" onchange="togB(this,'fc')"></th>
@@ -938,14 +945,14 @@ function kI(el,id){
   const q=el.value.toLowerCase(),row=kR.find(r=>r.id===id);if(row)row.n=el.value;
   document.querySelectorAll('.ad').forEach(d=>d.remove());
   if(!q){rc();return;}
-  const m=PR.filter(p=>p.nazwa.toLowerCase().includes(q)).slice(0,8);if(!m.length)return;
+  const m=PR.filter(p=>!p.deleted_at&&p.nazwa.toLowerCase().includes(q)).slice(0,8);if(!m.length)return;
   const w=el.closest('.aw');const dd=document.createElement('div');dd.className='ad';
   m.forEach(p=>{const d=document.createElement('div');d.textContent=p.nazwa;d.onmousedown=()=>{el.value=p.nazwa;if(row)row.n=p.nazwa;dd.remove();rc();};dd.appendChild(d);});
   w.appendChild(dd);el.onblur=()=>setTimeout(()=>dd.remove(),150);
 }
 function kW(el,id){const row=kR.find(r=>r.id===id);if(row)row.w=parseFloat(el.value)||0;rc();}
 function gKD(){
-  const pd={};PR.forEach(p=>pd[p.nazwa]=p);
+  const pd={};PR.filter(p=>!p.deleted_at).forEach(p=>pd[p.nazwa]=p);
   let t={wg:0,kc:0,tl:0,tn:0,we:0,cu:0,bi:0,so:0,ko:0};const us=[];
   kR.forEach(r=>{if(!r.n||r.w<=0)return;const p=pd[r.n];if(!p)return;const w=r.w;
     t.wg+=w;t.kc+=(parseFloat(p.kcal)||0)*w/100;t.tl+=(parseFloat(p.tluszcze)||0)*w/100;
@@ -1110,15 +1117,13 @@ let OP = []; // cache opakowań
 function renOpak(){
   const q=(document.getElementById('search-opak')?.value||'').toLowerCase();
   const tb=document.getElementById('opak-tbody'); tb.innerHTML='';
-  OP.filter(o=>!o.deleted_at).filter(o=>!q||o.nazwa.toLowerCase().includes(q)||(o.opis||'').toLowerCase().includes(q))
+  OP.filter(o=>!o.deleted_at).filter(o=>!q||o.nazwa.toLowerCase().includes(q))
   .forEach((o,i)=>{
     const bg=i%2?'background:var(--s2)':'background:var(--s)';
     tb.innerHTML+=`<tr style="${bg}">
       <td><input type="checkbox" class="opak-chk" data-id="${o.id}"></td>
-      <td><input class="ci" type="text" value="${o.nazwa||''}" style="width:170px"
+      <td><input class="ci" type="text" value="${o.nazwa||''}" style="width:210px"
         onchange="upOpak('${o.id}','nazwa',this.value)"></td>
-      <td><input class="ci" type="text" value="${o.opis||''}" style="width:190px"
-        onchange="upOpak('${o.id}','opis',this.value)"></td>
       <td><input class="ci" type="number" value="${o.cena||0}" style="width:80px;text-align:right" step="0.01"
         onchange="upOpak('${o.id}','cena',this.value)"></td>
       <td><select class="ci sel" style="width:68px" onchange="upOpak('${o.id}','jednostka',this.value)">
@@ -1169,7 +1174,7 @@ function opakAC(inp){
   const drop=inp.nextElementSibling;
   if(!drop)return;
   if(!q){drop.style.display='none';return;}
-  const matches=OP.filter(o=>!o.deleted_at&&(o.nazwa.toLowerCase().includes(q)||(o.opis||'').toLowerCase().includes(q))).slice(0,8);
+  const matches=OP.filter(o=>!o.deleted_at&&o.nazwa.toLowerCase().includes(q)).slice(0,8);
   if(!matches.length){drop.style.display='none';return;}
   drop.innerHTML=matches.map(o=>`
     <div onmousedown="pickOpak(this,'${o.nazwa.replace(/'/g,"\\'")}',${o.cena||0},${parseInt(inp.dataset.idx)||0})"
@@ -1225,6 +1230,166 @@ function getOpakDetails(){
     if(name||cena>0) items.push({nazwa:name,cena});
   });
   return items;
+}
+
+
+// ══════════════════════════════════════════════
+// UNIWERSALNY EKSPORT / IMPORT CSV (z polskimi znakami)
+// ══════════════════════════════════════════════
+
+// Definicje kolumn dla każdej bazy
+const CSV_SCHEMAS = {
+  produkty: {
+    table:'produkty', data:()=>PR.filter(p=>!p.deleted_at), reload:()=>{renP();renderFolders('prod');},
+    cols:['firma','nazwa','kategoria','pelny_sklad','alergeny','moze_zawierac','kcal','tluszcze','tluszcze_nas','weglowodany','cukry','bialka','sole','ilosc_zakupu','jednostka','waga_opak_g','cena_zakupu'],
+    labels:['Firma','Nazwa','Kategoria','Pełny skład','Alergeny','Może zawierać','kcal','Tłuszcze','Tłuszcze nas.','Węglowodany','Cukry','Białka','Sól','Ilość zakupu','Jednostka','Waga opak. (g)','Cena zakupu (zł)'],
+    nums:['kcal','tluszcze','tluszcze_nas','weglowodany','cukry','bialka','sole','ilosc_zakupu','waga_opak_g','cena_zakupu']
+  },
+  opakowania: {
+    table:'opakowania', data:()=>OP.filter(o=>!o.deleted_at), reload:()=>renOpak(),
+    cols:['nazwa','cena','jednostka'],
+    labels:['Nazwa','Cena (zł)','Jednostka'],
+    nums:['cena']
+  },
+  baza_odz: {
+    table:'baza_odz', data:()=>BO.filter(d=>!d.deleted_at), reload:()=>{renBO();renderFolders('odz');},
+    cols:['nazwa','kategoria','data','waga_g','kcal100','tl100','tlnas100','weg100','cukry100','bialka100','sol100','alergeny','moze_zawierac','sklad_etykieta'],
+    labels:['Nazwa','Kategoria','Data','Waga (g)','kcal/100g','Tłuszcze/100g','Tł.nas./100g','Węgl./100g','Cukry/100g','Białka/100g','Sól/100g','Alergeny','Może zawierać','Skład etykieta'],
+    nums:['waga_g','kcal100','tl100','tlnas100','weg100','cukry100','bialka100','sol100']
+  },
+  baza_fc: {
+    table:'baza_fc', data:()=>BF.filter(d=>!d.deleted_at), reload:()=>{renBF();renderFolders('fc');},
+    cols:['nazwa','kategoria','data','waga_g','koszt_sk','koszt_opak','koszt_rob','koszt_wytw','cena_sp','marza','sztuki','alert_cena','sklad_etykieta'],
+    labels:['Nazwa','Kategoria','Data','Waga (g)','Koszt skł.','Koszt opak.','Robocizna','Koszt wytw.','Cena sprzed.','Narzut %','Sztuki','Alert cena','Skład etykieta'],
+    nums:['waga_g','koszt_sk','koszt_opak','koszt_rob','koszt_wytw','cena_sp','marza','sztuki','alert_cena']
+  }
+};
+
+// Eksportuj dowolną bazę do CSV z BOM (polskie znaki w Excel)
+function exportBase(schemaKey){
+  const sc=CSV_SCHEMAS[schemaKey];
+  if(!sc){nt('Nieznana baza');return;}
+  const data=sc.data();
+  if(!data.length){nt('Ta baza jest pusta!');return;}
+
+  const esc=v=>{
+    const s=String(v??'').replace(/"/g,'""');
+    return /[;"\n\r]/.test(s)?`"${s}"`:s;
+  };
+  const rows=[sc.labels.join(';')];
+  data.forEach(d=>{
+    rows.push(sc.cols.map(c=>esc(d[c])).join(';'));
+  });
+  // BOM (\uFEFF) wymusza UTF-8 w Excel - polskie znaki działają
+  const csv='\uFEFF'+rows.join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const dateStr=new Date().toLocaleDateString('pl-PL').replace(/\./g,'-');
+  a.href=url;
+  a.download=`Sniadaniowcy_${schemaKey}_${dateStr}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  nt(`📤 Wyeksportowano ${data.length} pozycji z ${schemaKey}`);
+}
+
+// Import CSV do dowolnej bazy
+function importBase(schemaKey, fileInput){
+  const sc=CSV_SCHEMAS[schemaKey];
+  const file=fileInput.files[0];
+  if(!file||!sc)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      let text=e.target.result;
+      // Usuń BOM jeśli jest
+      if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+      const lines=text.split(/\r?\n/).filter(l=>l.trim());
+      if(lines.length<2){nt('Plik pusty lub bez danych');return;}
+
+      // Parsuj nagłówki - dopasuj po etykietach LUB nazwach kolumn
+      const headerCells=parseCsvLine(lines[0]);
+      const colMap=headerCells.map(h=>{
+        const hLow=h.trim().toLowerCase();
+        // dopasuj po labelu
+        const labelIdx=sc.labels.findIndex(l=>l.toLowerCase()===hLow);
+        if(labelIdx>=0)return sc.cols[labelIdx];
+        // dopasuj po nazwie kolumny
+        const colIdx=sc.cols.findIndex(c=>c.toLowerCase()===hLow);
+        if(colIdx>=0)return sc.cols[colIdx];
+        return null;
+      });
+
+      if(!colMap.includes('nazwa')){
+        nt('❌ Brak kolumny "Nazwa" w pliku');return;
+      }
+
+      if(!confirm(`Zaimportować ${lines.length-1} pozycji do ${schemaKey}?\n\nNowe zostaną dodane, istniejące (ta sama nazwa) zaktualizowane.`))return;
+
+      const existing={};
+      sc.data().forEach(d=>existing[(d.nazwa||'').toLowerCase()]=d);
+
+      let added=0, updated=0, failed=0;
+      for(let i=1;i<lines.length;i++){
+        const cells=parseCsvLine(lines[i]);
+        const obj={};
+        colMap.forEach((col,idx)=>{
+          if(!col)return;
+          let val=cells[idx]??'';
+          if(sc.nums.includes(col)) val=parseFloat(String(val).replace(',','.'))||0;
+          else if(col==='pelny_sklad') val=String(val).toUpperCase();
+          obj[col]=val;
+        });
+        if(!obj.nazwa||!obj.nazwa.trim()){failed++;continue;}
+
+        const ex=existing[obj.nazwa.toLowerCase()];
+        try{
+          if(ex){
+            await dbU(sc.table,ex.id,obj);
+            Object.assign(ex,obj);
+            updated++;
+          }else{
+            const r=await ins(sc.table,obj);
+            if(r&&r[0]){
+              if(schemaKey==='produkty')PR.push(r[0]);
+              else if(schemaKey==='opakowania')OP.push(r[0]);
+              else if(schemaKey==='baza_odz')BO.push(r[0]);
+              else if(schemaKey==='baza_fc')BF.push(r[0]);
+              added++;
+            }else failed++;
+          }
+        }catch(err){console.error('Import wiersz',i,err);failed++;}
+      }
+      sc.reload();
+      nt(`✅ Import: +${added} nowych, ${updated} zaktualizowanych${failed?`, ${failed} pominięto`:''}`);
+    }catch(err){
+      console.error('Błąd importu:',err);
+      nt('❌ Błąd importu pliku');
+    }
+  };
+  reader.readAsText(file,'UTF-8');
+  fileInput.value='';
+}
+
+// Parser linii CSV obsługujący cudzysłowy i średniki w wartościach
+function parseCsvLine(line){
+  const result=[];
+  let cur='', inQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(inQuotes){
+      if(ch==='"'){
+        if(line[i+1]==='"'){cur+='"';i++;}
+        else inQuotes=false;
+      }else cur+=ch;
+    }else{
+      if(ch==='"')inQuotes=true;
+      else if(ch===';'){result.push(cur);cur='';}
+      else cur+=ch;
+    }
+  }
+  result.push(cur);
+  return result;
 }
 
 let _pendingSave = null;
@@ -1624,17 +1789,44 @@ const DB_FIELDS=[
 ];
 let csvRows=[], csvHeaders=[], csvMappings={};
 
+// Porządny parser CSV - obsługuje cudzysłowy, przecinki w wartościach, polskie znaki
+function parseCSVText(txt){
+  // Usuń BOM jeśli jest
+  if(txt.charCodeAt(0)===0xFEFF) txt=txt.slice(1);
+  // Wykryj separator z pierwszej linii
+  const firstLine=txt.split(/\r?\n/)[0];
+  const sep=(firstLine.split(';').length>firstLine.split(',').length)?';':',';
+  const rows=[];
+  let row=[], field='', inQuotes=false;
+  for(let i=0;i<txt.length;i++){
+    const c=txt[i], next=txt[i+1];
+    if(inQuotes){
+      if(c==='"'&&next==='"'){field+='"';i++;}
+      else if(c==='"'){inQuotes=false;}
+      else field+=c;
+    } else {
+      if(c==='"'){inQuotes=true;}
+      else if(c===sep){row.push(field);field='';}
+      else if(c==='\n'||c==='\r'){
+        if(c==='\r'&&next==='\n')i++;
+        if(field!==''||row.length){row.push(field);rows.push(row);row=[];field='';}
+      }
+      else field+=c;
+    }
+  }
+  if(field!==''||row.length){row.push(field);rows.push(row);}
+  return rows;
+}
+
 function loadCSV(inp){
   const file=inp.files[0]; if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
     const txt=e.target.result;
-    // Detect separator
-    const sep=txt.indexOf(';')>txt.indexOf(',')&&txt.split('\n')[0].split(';').length>txt.split('\n')[0].split(',').length?';':',';
-    const lines=txt.trim().split('\n').map(l=>l.split(sep).map(c=>c.trim().replace(/^"|"$/g,'')));
+    const lines=parseCSVText(txt);
     if(lines.length<2){alert('Plik CSV jest pusty lub ma tylko nagłówki.');return;}
-    csvHeaders=lines[0];
-    csvRows=lines.slice(1).filter(r=>r.some(c=>c));
+    csvHeaders=lines[0].map(h=>h.trim());
+    csvRows=lines.slice(1).filter(r=>r.some(c=>c&&c.trim()));
     buildCSVModal();
     document.getElementById('csv-modal').classList.add('open');
     document.getElementById('csv-info').textContent=`Znaleziono ${csvRows.length} wierszy danych`;
@@ -2077,6 +2269,66 @@ async function xmlApplyPrices(){
 }
 
 // ══ EKSPORT CSV ══
+// ══════════════════════════════════════════════
+// UNIWERSALNY EKSPORT/IMPORT CSV (polskie znaki UTF-8 + BOM)
+// ══════════════════════════════════════════════
+function csvEscape(v){
+  const s=String(v??'').replace(/"/g,'""');
+  return /[;\n\r"]/.test(s)?`"${s}"`:s;
+}
+
+function downloadCSV(filename, headers, labels, dataArray){
+  const rows=[labels.join(';')];
+  dataArray.forEach(item=>{
+    rows.push(headers.map(h=>{
+      let v=item[h];
+      // skladniki/fc_params/opakowania to obiekty - serializuj jako JSON
+      if(v!==null && typeof v==='object') v=JSON.stringify(v);
+      return csvEscape(v);
+    }).join(';'));
+  });
+  // BOM + UTF-8 gwarantuje polskie znaki w Excel/LibreOffice
+  const csv='\uFEFF'+rows.join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  const date=new Date().toLocaleDateString('pl-PL').replace(/\./g,'-');
+  a.download=`${filename}_${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Eksport bazy wartości odżywczych
+function exportODZ(){
+  const active=BO.filter(d=>!d.deleted_at);
+  if(!active.length){nt('Baza jest pusta!');return;}
+  const headers=['nazwa','kategoria','data','waga_g','kcal100','tl100','tlnas100','weg100','cukry100','bialka100','sol100','alergeny','moze_zawierac','sklad_etykieta','skladniki'];
+  const labels=['Nazwa','Kategoria','Data','Waga (g)','kcal/100g','Tłuszcze','Tł.nas.','Węglowodany','Cukry','Białka','Sól','Alergeny','Może zawierać','Skład etykieta','Składniki (JSON)'];
+  downloadCSV('Sniadaniowcy_wartosci_odzywcze',headers,labels,active);
+  nt(`📤 Wyeksportowano ${active.length} dań (wartości odżywcze)`);
+}
+
+// Eksport bazy food cost
+function exportFC(){
+  const active=BF.filter(d=>!d.deleted_at);
+  if(!active.length){nt('Baza jest pusta!');return;}
+  const headers=['nazwa','kategoria','data','waga_g','koszt_sk','koszt_opak','koszt_rob','koszt_wytw','cena_sp','marza','sztuki','alert_cena','sklad_etykieta','skladniki','fc_params'];
+  const labels=['Nazwa','Kategoria','Data','Waga (g)','Koszt skł.','Koszt opak.','Robocizna','Koszt wytw.','Cena sprzed.','Narzut %','Sztuki','Alert cena','Skład etykieta','Składniki (JSON)','Parametry FC (JSON)'];
+  downloadCSV('Sniadaniowcy_food_cost',headers,labels,active);
+  nt(`📤 Wyeksportowano ${active.length} dań (food cost)`);
+}
+
+// Eksport bazy opakowań
+function exportOpak(){
+  const active=OP.filter(o=>!o.deleted_at);
+  if(!active.length){nt('Baza opakowań jest pusta!');return;}
+  const headers=['nazwa','cena','jednostka'];
+  const labels=['Nazwa','Cena (zł)','Jednostka'];
+  downloadCSV('Sniadaniowcy_opakowania',headers,labels,active);
+  nt(`📤 Wyeksportowano ${active.length} opakowań`);
+}
+
 function exportCSV(){
   if(!PR.length){nt('Baza produktów jest pusta!');return;}
   const headers=['firma','nazwa','pelny_sklad','alergeny','moze_zawierac','kcal','tluszcze','tluszcze_nas','weglowodany','cukry','bialka','sole','ilosc_zakupu','jednostka','waga_opak_g','cena_zakupu'];
@@ -2094,7 +2346,7 @@ function exportCSV(){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url;a.download='NutriCalc_produkty_'+new Date().toLocaleDateString('pl-PL').replace(/\./g,'-')+'.csv';
+  a.href=url;a.download='Sniadaniowcy_produkty_'+new Date().toLocaleDateString('pl-PL').replace(/\./g,'-')+'.csv';
   a.click();URL.revokeObjectURL(url);
   nt(`📤 Wyeksportowano ${PR.length} produktów!`);
 }
