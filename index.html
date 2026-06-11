@@ -320,6 +320,8 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
           <button class="btn bgh sm" onclick="showTrash('opak')" id="trash-btn-opak">🗑 Kosz (<span id="trash-count-opak">0</span>)</button>
           <input type="text" id="search-opak" placeholder="🔍 Szukaj…" style="width:180px" oninput="renOpak()">
           <button class="btn sm" onclick="exportBase('opakowania')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
+          <button class="btn sm" onclick="document.getElementById('imp-opak').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
+          <input type="file" id="imp-opak" accept=".csv" style="display:none" onchange="importBase('opakowania',this)">
         </div>
       </div>
       <div class="tbl-wrap">
@@ -447,7 +449,6 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn sm" onclick="exportBase('baza_odz')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
         <button class="btn sm" onclick="document.getElementById('imp-odz').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
         <input type="file" id="imp-odz" accept=".csv" style="display:none" onchange="importBase('baza_odz',this)">
-        <button class="btn sm" onclick="exportODZ()" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
       </div></div>
       <div class="tw"><table><thead><tr>
         <th style="width:30px"><input type="checkbox" onchange="togB(this,'odz')"></th>
@@ -479,7 +480,6 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn sm" onclick="exportBase('baza_fc')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
         <button class="btn sm" onclick="document.getElementById('imp-fc').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
         <input type="file" id="imp-fc" accept=".csv" style="display:none" onchange="importBase('baza_fc',this)">
-        <button class="btn sm" onclick="exportFC()" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
       </div></div>
       <div class="tw"><table><thead><tr>
         <th style="width:30px"><input type="checkbox" onchange="togB(this,'fc')"></th>
@@ -1272,13 +1272,20 @@ function exportBase(schemaKey){
   const data=sc.data();
   if(!data.length){nt('Ta baza jest pusta!');return;}
 
-  const esc=v=>{
-    const s=String(v??'').replace(/"/g,'""');
+  const esc=(v,isNum)=>{
+    if(isNum){
+      // Liczby: przecinek dziesiętny (polski Excel) + apostrof chroni przed interpretacją jako data
+      const n=parseFloat(v)||0;
+      return String(n).replace('.',',');
+    }
+    let s=String(v??'').replace(/"/g,'""');
+    // Tekst który wygląda jak liczba/data - owiń żeby Excel nie konwertował
+    if(/^[\d]+[.,]?[\d]*$/.test(s) && s.length>0) return `"${s}"`;
     return /[;"\n\r]/.test(s)?`"${s}"`:s;
   };
   const rows=[sc.labels.join(';')];
   data.forEach(d=>{
-    rows.push(sc.cols.map(c=>esc(d[c])).join(';'));
+    rows.push(sc.cols.map(c=>esc(d[c],sc.nums.includes(c))).join(';'));
   });
   // BOM (\uFEFF) wymusza UTF-8 w Excel - polskie znaki działają
   const csv='\uFEFF'+rows.join('\r\n');
