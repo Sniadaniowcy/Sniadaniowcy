@@ -220,6 +220,12 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     <div class="tab active" id="tab-produkty">
       <p class="pt">Baza Produktów</p>
       <p class="ps">Kliknij w komórkę żeby edytować. Zmiany zapisują się automatycznie — widoczne na każdym urządzeniu.</p>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="background:var(--s2);border:1px solid var(--bo);border-radius:8px;padding:6px 14px;font-size:.85rem">
+          📦 Produktów w bazie: <strong id="prod-count" style="color:var(--ac);font-size:1rem">0</strong>
+        </div>
+      </div>
+      <div class="folders-bar" id="folders-prod"></div>
       <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap">
         <button class="btn bg" onclick="addP()">+ Nowy produkt</button>
         <button class="btn br sm" onclick="delSel()">🗑 Do kosza</button>
@@ -231,7 +237,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
       </div></div>
       <div class="tw"><table><thead><tr>
         <th style="width:30px"><input type="checkbox" id="ca" onchange="togA(this)"></th>
-        <th>Firma</th><th>Nazwa *</th><th>Pełny skład</th><th>Alergeny</th><th>Może zawierać</th>
+        <th style="width:100px">Kategoria</th><th>Firma</th><th>Nazwa *</th><th>Pełny skład</th><th>Alergeny</th><th>Może zawierać</th>
         <th>kcal</th><th>Tłuszcze</th><th>Tł.nas.</th><th>Węglow.</th><th>Cukry</th><th>Białka</th><th>Sól</th>
         <th>Ilość</th><th>Jedn.</th><th>Waga opak.</th><th>Cena zakupu</th><th>Cena/1g</th>
       </tr></thead><tbody id="pb"></tbody></table></div>
@@ -594,6 +600,40 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     </div>
   </div>
 </div>
+<!-- MODAL NOWEGO PRODUKTU -->
+<div class="confirm-overlay" id="prod-modal" style="display:none" onclick="if(event.target===this)closeProdModal()">
+  <div class="confirm-box" style="max-width:560px">
+    <div class="confirm-hdr">
+      <span class="icon">📦</span>
+      <h2>Nowy produkt</h2>
+    </div>
+    <div class="confirm-body" id="prod-modal-body" style="max-height:60vh;overflow-y:auto">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="grid-column:1/3"><label>Nazwa produktu *</label><input type="text" id="np-nazwa" placeholder="np. Jogurt naturalny"></div>
+        <div><label>Firma</label><input type="text" id="np-firma" placeholder="np. Bakoma"></div>
+        <div><label>Kategoria</label><input type="text" id="np-kategoria" placeholder="np. Nabiał" list="prod-kat-list"><datalist id="prod-kat-list"></datalist></div>
+        <div style="grid-column:1/3"><label>Pełny skład (CAPS)</label><input type="text" id="np-sklad" placeholder="np. MLEKO, KULTURY BAKTERII" style="text-transform:uppercase"></div>
+        <div><label>Alergeny</label><input type="text" id="np-alergeny" placeholder="np. mleko"></div>
+        <div><label>Może zawierać</label><input type="text" id="np-moze" placeholder="np. orzechy"></div>
+        <div><label>kcal /100g</label><input type="number" id="np-kcal" value="0" step="0.1"></div>
+        <div><label>Tłuszcze /100g</label><input type="number" id="np-tluszcze" value="0" step="0.1"></div>
+        <div><label>Tł. nasycone</label><input type="number" id="np-tluszcze_nas" value="0" step="0.1"></div>
+        <div><label>Węglowodany</label><input type="number" id="np-weglowodany" value="0" step="0.1"></div>
+        <div><label>Cukry</label><input type="number" id="np-cukry" value="0" step="0.1"></div>
+        <div><label>Białka</label><input type="number" id="np-bialka" value="0" step="0.1"></div>
+        <div><label>Sól</label><input type="number" id="np-sole" value="0" step="0.01"></div>
+        <div><label>Ilość zakupu</label><input type="number" id="np-ilosc_zakupu" value="1" step="0.01"></div>
+        <div><label>Jednostka</label><select id="np-jednostka"><option>kg</option><option>g</option><option>dag</option><option>l</option><option>ml</option><option>szt</option><option>opak</option></select></div>
+        <div><label>Waga opak. (g)</label><input type="number" id="np-waga_opak_g" value="0" step="1"></div>
+        <div><label>Cena zakupu (zł)</label><input type="number" id="np-cena_zakupu" value="0" step="0.01"></div>
+      </div>
+    </div>
+    <div class="confirm-footer">
+      <button class="btn bgh" onclick="closeProdModal()">✕ Anuluj</button>
+      <button class="btn bg" id="np-save-btn" onclick="saveNewProd()">✅ Zapisz produkt</button>
+    </div>
+  </div>
+</div>
 <div class="nf" id="nf"></div>
 <script>
 /*
@@ -605,6 +645,7 @@ ALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NUL
 ALTER TABLE baza_fc  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
 ALTER TABLE produkty ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
 ALTER TABLE opakowania ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE produkty ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT '';
 
 -- Nowa tabela opakowań (uruchom osobno jeśli nie istnieje):
 -- CREATE TABLE IF NOT EXISTS opakowania (
@@ -703,7 +744,7 @@ async function init(){
     document.getElementById('dot').className='dot ok';
     document.getElementById('clb').textContent='połączono ✓';
     document.getElementById('lo').style.display='none';
-    renP();iK();renOpak();renderFolders('odz');renderFolders('fc');updateTrashCount();autoCleanTrash();
+    renP();iK();renOpak();renderFolders('prod');renderFolders('odz');renderFolders('fc');updateTrashCount();autoCleanTrash();
     // Jednorazowe przypomnienie o SQL dla kolumny kategoria
     if(!localStorage.getItem('sql_kategoria_done')){
       console.info('💡 Aby używać folderów, wklej w Supabase SQL Editor:\nALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';\nALTER TABLE baza_fc ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';');
@@ -740,24 +781,107 @@ const c1g=p=>{const i=parseFloat(p.ilosc_zakupu)||1,j=(p.jednostka||'kg').toLowe
 const NF=['kcal','tluszcze','tluszcze_nas','weglowodany','cukry','bialka','sole','ilosc_zakupu','waga_opak_g','cena_zakupu'];
 const PFD=[{k:'firma',t:'tx',w:80},{k:'nazwa',t:'tx',w:130},{k:'pelny_sklad',t:'tx',w:150},{k:'alergeny',t:'tx',w:100},{k:'moze_zawierac',t:'tx',w:100},{k:'kcal',t:'nm',w:52},{k:'tluszcze',t:'nm',w:64},{k:'tluszcze_nas',t:'nm',w:56},{k:'weglowodany',t:'nm',w:64},{k:'cukry',t:'nm',w:52},{k:'bialka',t:'nm',w:56},{k:'sole',t:'nm',w:52},{k:'ilosc_zakupu',t:'nm',w:56},{k:'jednostka',t:'sl',w:62,o:['kg','g','dag','l','ml','szt','opak']},{k:'waga_opak_g',t:'nm',w:72},{k:'cena_zakupu',t:'nm',w:80}];
 
-async function addP(){
-  const r=await ins('produkty',{firma:'',nazwa:'Nowy produkt',pelny_sklad:'',alergeny:'',moze_zawierac:'',kcal:0,tluszcze:0,tluszcze_nas:0,weglowodany:0,cukry:0,bialka:0,sole:0,ilosc_zakupu:1,jednostka:'kg',waga_opak_g:0,cena_zakupu:0});
-  if(r&&r[0]){PR.push(r[0]);renP();nt('✅ Dodano produkt');}
-  else nt('❌ Błąd — nie dodano produktu');
+function addP(){
+  // Wyczyść pola modala
+  ['nazwa','firma','kategoria','sklad','alergeny','moze'].forEach(f=>{
+    const el=document.getElementById('np-'+f); if(el) el.value='';
+  });
+  ['kcal','tluszcze','tluszcze_nas','weglowodany','cukry','bialka','sole','waga_opak_g','cena_zakupu'].forEach(f=>{
+    const el=document.getElementById('np-'+f); if(el) el.value='0';
+  });
+  const ilEl=document.getElementById('np-ilosc_zakupu'); if(ilEl) ilEl.value='1';
+  const jEl=document.getElementById('np-jednostka'); if(jEl) jEl.value='kg';
+  // Wypełnij listę istniejących kategorii
+  const dl=document.getElementById('prod-kat-list');
+  if(dl){
+    const cats=[...new Set(PR.filter(p=>!p.deleted_at).map(p=>p.kategoria||'').filter(c=>c))].sort();
+    dl.innerHTML=cats.map(c=>`<option value="${c}">`).join('');
+  }
+  document.getElementById('prod-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('np-nazwa')?.focus(),100);
+}
+
+function closeProdModal(){
+  document.getElementById('prod-modal').style.display='none';
+}
+
+async function saveNewProd(){
+  const nazwa=document.getElementById('np-nazwa').value.trim();
+  if(!nazwa){alert('Podaj nazwę produktu!');return;}
+  const g=v=>document.getElementById('np-'+v)?.value||'';
+  const gn=v=>parseFloat(document.getElementById('np-'+v)?.value)||0;
+  const prod={
+    nazwa,
+    firma:g('firma'),
+    kategoria:g('kategoria'),
+    pelny_sklad:g('sklad').toUpperCase(),
+    alergeny:g('alergeny'),
+    moze_zawierac:g('moze'),
+    kcal:gn('kcal'),tluszcze:gn('tluszcze'),tluszcze_nas:gn('tluszcze_nas'),
+    weglowodany:gn('weglowodany'),cukry:gn('cukry'),bialka:gn('bialka'),sole:gn('sole'),
+    ilosc_zakupu:gn('ilosc_zakupu'),jednostka:g('jednostka')||'kg',
+    waga_opak_g:gn('waga_opak_g'),cena_zakupu:gn('cena_zakupu')
+  };
+  const btn=document.getElementById('np-save-btn');
+  btn.textContent='⏳ Zapisuję…';btn.disabled=true;
+  try{
+    const r=await ins('produkty',prod);
+    if(r&&r[0]){
+      PR.push(r[0]);
+      renP();
+      renderFolders('prod');
+      // Modal znika TYLKO po udanym zapisie do Supabase
+      closeProdModal();
+      nt(`✅ "${nazwa}" zapisany w bazie!`);
+    } else {
+      throw new Error('Supabase nie potwierdził zapisu');
+    }
+  }catch(e){
+    console.error('Błąd zapisu produktu:',e);
+    nt('❌ NIE ZAPISANO! '+(e.message||'Sprawdź połączenie'));
+  }
+  btn.textContent='✅ Zapisz produkt';btn.disabled=false;
 }
 function renP(){
   const q=(document.getElementById('sp')?.value||'').toLowerCase();
-  const list=PR.filter(p=>!p.deleted_at).filter(p=>!q||p.nazwa.toLowerCase().includes(q)||(p.firma||'').toLowerCase().includes(q));
+  const af=activeFolder['prod']||'__all__';
+  let list=PR.filter(p=>!p.deleted_at).filter(p=>{
+    if(q && !(p.nazwa.toLowerCase().includes(q)||(p.firma||'').toLowerCase().includes(q))) return false;
+    if(af==='__all__')  return true;
+    if(af==='__none__') return !p.kategoria;
+    return p.kategoria===af;
+  });
+  // Sortowanie alfabetyczne wg nazwy (polskie znaki)
+  list.sort((a,b)=>(a.nazwa||'').localeCompare(b.nazwa||'','pl',{sensitivity:'base'}));
+
+  // Licznik produktów (wszystkich nieusniętych, nie tylko widocznych)
+  const totalCount=PR.filter(p=>!p.deleted_at).length;
+  const cntEl=document.getElementById('prod-count');
+  if(cntEl) cntEl.textContent=totalCount;
+
   const tb=document.getElementById('pb');tb.innerHTML='';
   list.forEach(p=>{
-    const g=c1g(p);let c=`<td><input type="checkbox" class="ck" data-id="${p.id}"></td>`;
+    const g=c1g(p);
+    let c=`<td><input type="checkbox" class="ck" data-id="${p.id}"></td>`;
+    // Kolumna kategoria (badge + edytowalna przez prawy klik)
+    const katBadge=p.kategoria
+      ?`<span style="background:rgba(237,179,19,.15);border:1px solid rgba(237,179,19,.3);color:var(--ac);border-radius:10px;padding:1px 7px;font-size:.7rem">${p.kategoria}</span>`
+      :`<span style="color:var(--mu);font-size:.7rem">—</span>`;
+    c+=`<td>${katBadge}</td>`;
     PFD.forEach(f=>{
       if(f.t==='sl'){const o=f.o.map(x=>`<option${x===p[f.k]?' selected':''}>${x}</option>`).join('');c+=`<td><select class="ci sel" style="width:${f.w}px" onchange="upP('${p.id}','${f.k}',this.value)">${o}</select></td>`;}
       else{const isUp=f.k==='pelny_sklad';const upAttr=isUp?"this.value.toUpperCase()":"this.value";c+=`<td><input class="ci${isUp?' ci-upper':''}" type="${f.t==='nm'?'number':'text'}" value="${p[f.k]??''}" style="width:${f.w}px;${isUp?'text-transform:uppercase':''}" step="${f.t==='nm'?'0.001':''}" onchange="upP('${p.id}','${f.k}',${upAttr})"></td>`;}
     });
     c+=`<td style="color:var(--green);font-weight:600;font-size:.8rem;white-space:nowrap" id="g${p.id}">${g?g.toFixed(4)+' zł':'—'}</td>`;
-    const tr=document.createElement('tr');tr.dataset.id=p.id;tr.innerHTML=c;tb.appendChild(tr);
+    const tr=document.createElement('tr');
+    tr.dataset.id=p.id;
+    tr.draggable=true;
+    tr.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',p.id));
+    tr.oncontextmenu=e=>{showMoveMenu(e,'prod',p.id,p.nazwa);return false;};
+    tr.innerHTML=c;
+    tb.appendChild(tr);
   });
+  renderFolders('prod');
 }
 let uT={};
 function upP(id,f,v){
@@ -2128,13 +2252,13 @@ function setSuggestedMarza(cenaTarget){
 // ══════════════════════════════════════════════
 // SYSTEM FOLDERÓW / KATEGORII
 // ══════════════════════════════════════════════
-let activeFolder = {odz: '__all__', fc: '__all__'};
+let activeFolder = {prod: '__all__', odz: '__all__', fc: '__all__'};
 
 function renderFolders(type){
   const el = document.getElementById(`folders-${type}`);
   if(!el) return;
   const folders = getFolders(type);
-  const data = type==='odz' ? BO : BF;
+  const data = type==='prod' ? PR.filter(p=>!p.deleted_at) : type==='odz' ? BO : BF;
   const active = activeFolder[type];
 
   const allCount = data.length;
@@ -2186,8 +2310,7 @@ function renderFolders(type){
 function setFolder(type, folder){
   activeFolder[type] = folder;
   renderFolders(type);
-  if(type==='odz') renBO();
-  else renBF();
+  if(type==='prod') renP(); else if(type==='odz') renBO(); else renBF();
 }
 
 async function newFolder(type){
@@ -2226,7 +2349,7 @@ function getTempFolders(type){
 }
 
 function getFolders(type){
-  const data = type==='odz' ? BO : BF;
+  const data = type==='prod' ? PR : type==='odz' ? BO : BF;
   const fromData = new Set(data.map(d=>d.kategoria||'').filter(c=>c));
   const fromTemp = new Set(getTempFolders(type));
   return [...new Set([...fromData, ...fromTemp])].sort();
@@ -2237,8 +2360,8 @@ async function dropToFolder(event, type, folderName, btn){
   event.preventDefault();
   const id = event.dataTransfer.getData('text/plain');
   if(!id) return;
-  const data = type==='odz' ? BO : BF;
-  const table = type==='odz' ? 'baza_odz' : 'baza_fc';
+  const data = type==='prod' ? PR : type==='odz' ? BO : BF;
+  const table = type==='prod' ? 'produkty' : type==='odz' ? 'baza_odz' : 'baza_fc';
   const item = data.find(d=>d.id===id);
   if(!item) return;
   const oldKat = item.kategoria || '';
@@ -2246,7 +2369,7 @@ async function dropToFolder(event, type, folderName, btn){
   item.kategoria = folderName;
   await dbU(table, id, {kategoria: folderName});
   renderFolders(type);
-  if(type==='odz') renBO(); else renBF();
+  if(type==='prod') renP(); else if(type==='odz') renBO(); else renBF();
   nt(`📁 "${item.nazwa}" → ${folderName}`);
 }
 
@@ -2254,8 +2377,8 @@ async function renameFolder(type, oldName){
   const newName = prompt(`Zmień nazwę folderu "${oldName}":`, oldName);
   if(!newName || !newName.trim() || newName.trim()===oldName) return;
   const trimmed = newName.trim();
-  const data = type==='odz' ? BO : BF;
-  const table = type==='odz' ? 'baza_odz' : 'baza_fc';
+  const data = type==='prod' ? PR : type==='odz' ? BO : BF;
+  const table = type==='prod' ? 'produkty' : type==='odz' ? 'baza_odz' : 'baza_fc';
   const toUpdate = data.filter(d=>d.kategoria===oldName);
   for(const d of toUpdate){
     d.kategoria = trimmed;
@@ -2270,14 +2393,14 @@ async function renameFolder(type, oldName){
   }catch(e){}
   if(activeFolder[type]===oldName) activeFolder[type]=trimmed;
   renderFolders(type);
-  if(type==='odz') renBO(); else renBF();
+  if(type==='prod') renP(); else if(type==='odz') renBO(); else renBF();
   nt(`✏ Folder przemianowany na "${trimmed}"`);
 }
 
 async function deleteFolder(type, name){
-  if(!confirm(`Usunąć folder "${name}"?\n\nDania pozostaną — tylko folder zniknie.`)) return;
-  const data  = type==='odz' ? BO : BF;
-  const table = type==='odz' ? 'baza_odz' : 'baza_fc';
+  if(!confirm(`Usunąć folder "${name}"?\n\nElementy pozostaną — tylko folder zniknie.`)) return;
+  const data  = type==='prod' ? PR : type==='odz' ? BO : BF;
+  const table = type==='prod' ? 'produkty' : type==='odz' ? 'baza_odz' : 'baza_fc';
   const toUpdate = data.filter(d=>d.kategoria===name);
   for(const d of toUpdate){
     d.kategoria = '';
@@ -2290,7 +2413,7 @@ async function deleteFolder(type, name){
   }catch(e){}
   if(activeFolder[type]===name) activeFolder[type]='__all__';
   renderFolders(type);
-  if(type==='odz') renBO(); else renBF();
+  if(type==='prod') renP(); else if(type==='odz') renBO(); else renBF();
   nt(`🗑 Folder "${name}" usunięty (dania zachowane)`);
 }
 
@@ -2322,14 +2445,14 @@ function showMoveMenu(event, type, id, nazwa){
 }
 
 async function moveToFolder(type, id, folderName){
-  const data  = type==='odz' ? BO : BF;
-  const table = type==='odz' ? 'baza_odz' : 'baza_fc';
+  const data  = type==='prod' ? PR : type==='odz' ? BO : BF;
+  const table = type==='prod' ? 'produkty' : type==='odz' ? 'baza_odz' : 'baza_fc';
   const item = data.find(d=>d.id===id);
   if(!item) return;
   item.kategoria = folderName;
   await dbU(table, id, {kategoria: folderName});
   renderFolders(type);
-  if(type==='odz') renBO(); else renBF();
+  if(type==='prod') renP(); else if(type==='odz') renBO(); else renBF();
   nt(`📁 "${item.nazwa}" przeniesione`);
 }
 
