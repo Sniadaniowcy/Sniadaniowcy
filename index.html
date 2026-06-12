@@ -233,7 +233,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn" onclick="document.getElementById('csv-inp').click()" style="background:rgba(255,217,26,.2);color:var(--ac);border:1px solid rgba(255,217,26,.4)">📂 Importuj CSV</button>
         <button class="btn" onclick="exportBase('produkty')" style="background:rgba(91,155,213,.2);color:#5B9BD5;border:1px solid rgba(91,155,213,.4)">📤 Eksportuj CSV</button>
         <input type="file" id="csv-inp" accept=".csv" style="display:none" onchange="loadCSV(this)">
-        <input type="text" id="sp" placeholder="🔍 Szukaj…" style="width:180px" oninput="renP()">
+        <input type="text" id="sp" placeholder="🔍 Szukaj…" style="width:180px" oninput="debSearch(renP,'prod')">
       </div></div>
       <div class="tw"><table><thead><tr>
         <th style="width:30px"><input type="checkbox" id="ca" onchange="togA(this)"></th>
@@ -318,7 +318,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
           <button class="btn bg" onclick="addOpak()">+ Nowe opakowanie</button>
           <button class="btn br sm" onclick="delOpak()">🗑 Do kosza</button>
           <button class="btn bgh sm" onclick="showTrash('opak')" id="trash-btn-opak">🗑 Kosz (<span id="trash-count-opak">0</span>)</button>
-          <input type="text" id="search-opak" placeholder="🔍 Szukaj…" style="width:180px" oninput="renOpak()">
+          <input type="text" id="search-opak" placeholder="🔍 Szukaj…" style="width:180px" oninput="debSearch(renOpak,'opak')">
           <button class="btn sm" onclick="exportBase('opakowania')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
           <button class="btn sm" onclick="document.getElementById('imp-opak').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
           <input type="file" id="imp-opak" accept=".csv" style="display:none" onchange="importBase('opakowania',this)">
@@ -445,7 +445,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn bb sm" onclick="ltk('odz')">✏ Wczytaj do kalkulatora</button>
         <button class="btn br sm" onclick="dB('odz')">🗑 Do kosza</button>
         <button class="btn bgh sm" onclick="showTrash('odz')" id="trash-btn-odz">🗑 Kosz (<span id="trash-count-odz">0</span>)</button>
-        <input type="text" id="search-odz" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBO()">
+        <input type="text" id="search-odz" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="debSearch(renBO,'odz')">
         <button class="btn sm" onclick="exportBase('baza_odz')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
         <button class="btn sm" onclick="document.getElementById('imp-odz').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
         <input type="file" id="imp-odz" accept=".csv" style="display:none" onchange="importBase('baza_odz',this)">
@@ -476,7 +476,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn bb sm" onclick="ltk('fc')">✏ Wczytaj do kalkulatora</button>
         <button class="btn br sm" onclick="dB('fc')">🗑 Do kosza</button>
         <button class="btn bgh sm" onclick="showTrash('fc')" id="trash-btn-fc">🗑 Kosz (<span id="trash-count-fc">0</span>)</button>
-        <input type="text" id="search-fc" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="renBF()">
+        <input type="text" id="search-fc" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="debSearch(renBF,'fc')">
         <button class="btn sm" onclick="exportBase('baza_fc')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
         <button class="btn sm" onclick="document.getElementById('imp-fc').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
         <input type="file" id="imp-fc" accept=".csv" style="display:none" onchange="importBase('baza_fc',this)">
@@ -1116,11 +1116,11 @@ let OP = []; // cache opakowań
 
 function renOpak(){
   const q=(document.getElementById('search-opak')?.value||'').toLowerCase();
-  const tb=document.getElementById('opak-tbody'); tb.innerHTML='';
+  const tb=document.getElementById('opak-tbody'); let _h='';
   OP.filter(o=>!o.deleted_at).filter(o=>!q||o.nazwa.toLowerCase().includes(q))
   .forEach((o,i)=>{
     const bg=i%2?'background:var(--s2)':'background:var(--s)';
-    tb.innerHTML+=`<tr style="${bg}">
+    _h+=`<tr style="${bg}">
       <td><input type="checkbox" class="opak-chk" data-id="${o.id}"></td>
       <td><input class="ci" type="text" value="${o.nazwa||''}" style="width:210px"
         onchange="upOpak('${o.id}','nazwa',this.value)"></td>
@@ -1132,6 +1132,7 @@ function renOpak(){
       <td style="color:var(--ac);font-weight:600;font-size:.82rem;text-align:right">${(parseFloat(o.cena)||0).toFixed(2)} zł</td>
     </tr>`;
   });
+  tb.innerHTML=_h;
 }
 
 let uTO={};
@@ -1234,6 +1235,13 @@ function getOpakDetails(){
 
 
 // ══════════════════════════════════════════════
+// Debounce dla wyszukiwarek - nie przebudowuj tabeli przy każdym klawiszu
+let _searchTimers={};
+function debSearch(fn,key){
+  clearTimeout(_searchTimers[key]);
+  _searchTimers[key]=setTimeout(fn,200);
+}
+
 // UNIWERSALNY EKSPORT / IMPORT CSV (z polskimi znakami)
 // ══════════════════════════════════════════════
 
@@ -1629,7 +1637,7 @@ async function rcB(){
 function renBO(){
   const q  = (document.getElementById('search-odz')?.value||'').toLowerCase();
   const af = activeFolder['odz'];
-  const tb = document.getElementById('bob'); tb.innerHTML='';
+  const tb = document.getElementById('bob'); let _h='';
   const list = BO.filter(d=>!d.deleted_at).filter(d=>{
     if(q && !d.nazwa.toLowerCase().includes(q)) return false;
     if(af==='__all__')  return true;
@@ -1645,7 +1653,7 @@ function renBO(){
       ?`<div style="max-height:44px;overflow:hidden" id="skod${d.id}"><span style="white-space:normal">${d.sklad_etykieta}</span></div>
         <button onclick="togSk('skod${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`
       :(d.sklad_etykieta||'—');
-    tb.innerHTML+=`<tr style="${bg};cursor:grab"
+    _h+=`<tr style="${bg};cursor:grab"
       draggable="true"
       ondragstart="event.dataTransfer.setData('text/plain','${d.id}')"
       oncontextmenu="showMoveMenu(event,'odz','${d.id}','${d.nazwa.replace(/'/g,"\\'").replace(/"/g,'&quot;')}');return false">
@@ -1662,12 +1670,13 @@ function renBO(){
       <td style="font-size:.77rem;max-width:180px">${sklRow}</td>
     </tr>`;
   });
+  tb.innerHTML=_h;
   renderFolders('odz');
 }
 function renBF(){
   const q  = (document.getElementById('search-fc')?.value||'').toLowerCase();
   const af = activeFolder['fc'];
-  const tb = document.getElementById('bfb'); tb.innerHTML='';
+  const tb = document.getElementById('bfb'); let _h='';
   const list = BF.filter(d=>!d.deleted_at).filter(d=>{
     if(q && !d.nazwa.toLowerCase().includes(q)) return false;
     if(af==='__all__')  return true;
@@ -1688,7 +1697,7 @@ function renBF(){
         <button onclick="togSk('skfc${d.id}',this)" style="background:none;border:none;color:var(--ac);font-size:.72rem;cursor:pointer;padding:2px 0">▼ rozwiń</button>`
       :(d.sklad_etykieta||'—');
     const marzaColor=d.marza>=80?'var(--green)':d.marza>=40?'var(--ac)':d.marza>0?'var(--red)':'var(--mu)';
-    tb.innerHTML+=`<tr style="${bg};cursor:grab"
+    _h+=`<tr style="${bg};cursor:grab"
       draggable="true"
       ondragstart="event.dataTransfer.setData('text/plain','${d.id}')"
       oncontextmenu="showMoveMenu(event,'fc','${d.id}','${d.nazwa.replace(/'/g,"\\'").replace(/"/g,'&quot;')}');return false">
@@ -1706,6 +1715,7 @@ function renBF(){
       <td style="font-size:.77rem;max-width:180px">${sklRow}</td>
     </tr>`;
   });
+  tb.innerHTML=_h;
   renderFolders('fc');
 }
 function togB(c,t){document.querySelectorAll(`.b${t[0]}c`).forEach(x=>x.checked=c.checked);}
