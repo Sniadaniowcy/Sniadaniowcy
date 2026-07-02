@@ -214,6 +214,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     <button class="nb" onclick="ST('opakowania',this)">📦 Baza Opakowań</button>
     <button class="nb" onclick="ST('baza-odz',this)">🥗 Baza Wartości Odżywczych</button>
     <button class="nb" onclick="ST('baza-fc',this)">📊 Baza Food Cost</button>
+    <button class="nb" onclick="ST('zakupy',this)">🛒 Lista Zakupów</button>
     <button class="nb" onclick="ST('xml-import',this)">🧾 Import XML Faktury</button>
   </nav>
   <div class="cnt">
@@ -607,7 +608,51 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     </div>
   </div>
 </div>
-<!-- MODAL NOWEGO PRODUKTU -->
+<!-- LISTA ZAKUPÓW -->
+    <div class="tab" id="tab-zakupy">
+      <p class="pt">Lista Zakupów</p>
+      <p class="ps">Zaznacz dania które planujesz przygotować i ile porcji — aplikacja zsumuje wszystkie potrzebne składniki.</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
+        <!-- LEWA: wybór dań -->
+        <div>
+          <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+            <strong style="font-size:.9rem">Wybierz dania</strong>
+            <input type="text" id="zak-search" placeholder="🔍 Szukaj…" style="width:160px" oninput="debSearch(renZakDania,'zak')">
+            <button class="btn br sm" onclick="clearZak()">✕ Wyczyść</button>
+          </div></div>
+          <div class="tbl-wrap" style="max-height:60vh;overflow-y:auto">
+            <table>
+              <thead><tr>
+                <th style="width:40px"></th>
+                <th>Danie</th>
+                <th style="width:90px">Porcje</th>
+              </tr></thead>
+              <tbody id="zak-dania-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PRAWA: lista składników -->
+        <div>
+          <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;justify-content:space-between;width:100%">
+            <strong style="font-size:.9rem">🛒 Potrzebne składniki</strong>
+            <div style="display:flex;gap:6px">
+              <button class="btn sm" onclick="exportZakupy()" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport</button>
+              <button class="btn sm" onclick="printZakupy()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">🖨 Drukuj</button>
+            </div>
+          </div></div>
+          <div id="zak-wynik" style="background:var(--s);border:1px solid var(--bo);border-radius:10px;padding:16px;min-height:200px">
+            <div style="text-align:center;color:var(--mu);padding:40px 20px">
+              <div style="font-size:2.5rem;margin-bottom:10px">🛒</div>
+              <div style="font-size:.9rem">Zaznacz dania po lewej stronie</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL NOWEGO PRODUKTU -->
 <div class="confirm-overlay" id="prod-modal" style="display:none" onclick="if(event.target===this)closeProdModal()">
   <div class="confirm-box" style="max-width:560px">
     <div class="confirm-hdr">
@@ -768,6 +813,7 @@ function ST(n,b){
   document.querySelectorAll('.nb').forEach(x=>x.classList.remove('active'));
   document.getElementById('tab-'+n).classList.add('active');
   if(b)b.classList.add('active');
+  if(n==='zakupy'){renZakDania();calcZakupy();}
   if(n==='opakowania')renOpak();
   if(n==='baza-odz')renBO();
   if(n==='baza-fc')renBF();
@@ -893,13 +939,20 @@ function renP(){
 let uT={};
 function upP(id,f,v){
   const p=PR.find(x=>x.id===id);if(!p)return;
+  const staraNazwa = p.nazwa; // zapamiętaj przed zmianą
   p[f]=NF.includes(f)?(parseFloat(v)||0):(f==='pelny_sklad'?v.toUpperCase():v);
   const e=document.getElementById('g'+id);const g=c1g(p);if(e)e.textContent=g?g.toFixed(4)+' zł':'—';
   clearTimeout(uT[id]);
   uT[id]=setTimeout(async()=>{
     try{
       await dbU('produkty',id,{[f]:p[f]});
-      nt('💾 Zapisano');
+      // Jeśli zmieniono NAZWĘ produktu - zaktualizuj ją we wszystkich daniach
+      if(f==='nazwa' && staraNazwa && staraNazwa!==p[f]){
+        await updateProductNameInDishes(staraNazwa, p[f]);
+        nt(`💾 Zapisano — zaktualizowano nazwę w daniach`);
+      } else {
+        nt('💾 Zapisano');
+      }
       // Przelicz bazy dań z opóźnieniem - nie blokuj UI
       clearTimeout(window._rcBTimer);
       window._rcBTimer=setTimeout(()=>rcB(),2000);
@@ -908,6 +961,40 @@ function upP(id,f,v){
       nt('❌ Błąd zapisu - sprawdź połączenie');
     }
   },1000);
+}
+
+// Aktualizuj nazwę składnika we wszystkich daniach (ODZ + FC)
+async function updateProductNameInDishes(staraNazwa, nowaNazwa){
+  const updates=[];
+
+  // Baza wartości odżywczych
+  BO.forEach(d=>{
+    if(!d.skladniki||!d.skladniki.length)return;
+    let zmieniono=false;
+    d.skladniki.forEach(sk=>{
+      if(sk.nazwa===staraNazwa){ sk.nazwa=nowaNazwa; zmieniono=true; }
+    });
+    if(zmieniono){
+      updates.push(dbU('baza_odz',d.id,{skladniki:d.skladniki}));
+    }
+  });
+
+  // Baza food cost
+  BF.forEach(d=>{
+    if(!d.skladniki||!d.skladniki.length)return;
+    let zmieniono=false;
+    d.skladniki.forEach(sk=>{
+      if(sk.nazwa===staraNazwa){ sk.nazwa=nowaNazwa; zmieniono=true; }
+    });
+    if(zmieniono){
+      updates.push(dbU('baza_fc',d.id,{skladniki:d.skladniki}));
+    }
+  });
+
+  if(updates.length){
+    await Promise.all(updates);
+    console.info(`Zaktualizowano nazwę "${staraNazwa}" → "${nowaNazwa}" w ${updates.length} daniach`);
+  }
 }
 function togA(c){document.querySelectorAll('.ck').forEach(x=>x.checked=c.checked);}
 async function delSel(){
@@ -1235,6 +1322,179 @@ function getOpakDetails(){
 
 
 // ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// LISTA ZAKUPÓW
+// ══════════════════════════════════════════════
+let zakSelected = {}; // {danieId: liczba_porcji}
+
+function renZakDania(){
+  const q=(document.getElementById('zak-search')?.value||'').toLowerCase();
+  const tb=document.getElementById('zak-dania-tbody');
+  if(!tb)return;
+  // Łącz dania z obu baz (unikalne nazwy), preferuj te ze składnikami
+  const wszystkie={};
+  [...BO,...BF].filter(d=>!d.deleted_at&&d.skladniki&&d.skladniki.length).forEach(d=>{
+    if(!wszystkie[d.nazwa.toLowerCase()]) wszystkie[d.nazwa.toLowerCase()]=d;
+  });
+  let list=Object.values(wszystkie);
+  if(q) list=list.filter(d=>d.nazwa.toLowerCase().includes(q));
+  list.sort((a,b)=>a.nazwa.localeCompare(b.nazwa,'pl'));
+
+  let _h='';
+  list.forEach((d,i)=>{
+    const bg=i%2?'background:var(--s2)':'background:var(--s)';
+    const sel=zakSelected[d.id]||0;
+    _h+=`<tr style="${bg}">
+      <td><input type="checkbox" ${sel>0?'checked':''} onchange="toggleZak('${d.id}',this.checked)"></td>
+      <td style="font-weight:600;font-size:.85rem">${d.nazwa}
+        <span style="color:var(--mu);font-size:.7rem">(${d.skladniki.length} skł.)</span></td>
+      <td><input type="number" min="1" value="${sel||1}" style="width:60px;text-align:center"
+        ${sel>0?'':'disabled'} id="zak-qty-${d.id}"
+        onchange="setZakQty('${d.id}',this.value)"></td>
+    </tr>`;
+  });
+  if(!list.length){
+    _h=`<tr><td colspan="3" style="text-align:center;color:var(--mu);padding:30px">
+      Brak dań ze składnikami. Zapisz dania w kalkulatorze.</td></tr>`;
+  }
+  tb.innerHTML=_h;
+  // Zapamiętaj dane dań do obliczeń
+  window._zakDania=wszystkie;
+}
+
+function toggleZak(id, checked){
+  if(checked) zakSelected[id]=zakSelected[id]||1;
+  else delete zakSelected[id];
+  const qtyEl=document.getElementById('zak-qty-'+id);
+  if(qtyEl) qtyEl.disabled=!checked;
+  calcZakupy();
+}
+
+function setZakQty(id, val){
+  const n=Math.max(1,parseInt(val)||1);
+  zakSelected[id]=n;
+  calcZakupy();
+}
+
+function clearZak(){
+  zakSelected={};
+  renZakDania();
+  calcZakupy();
+}
+
+function calcZakupy(){
+  const wynik=document.getElementById('zak-wynik');
+  if(!wynik)return;
+  const ids=Object.keys(zakSelected);
+  if(!ids.length){
+    wynik.innerHTML=`<div style="text-align:center;color:var(--mu);padding:40px 20px">
+      <div style="font-size:2.5rem;margin-bottom:10px">🛒</div>
+      <div style="font-size:.9rem">Zaznacz dania po lewej stronie</div></div>`;
+    return;
+  }
+  // Zsumuj składniki: nazwa → łączna waga
+  const skladniki={}; // nazwa -> waga(g)
+  const dania=[];
+  ids.forEach(id=>{
+    const d=[...BO,...BF].find(x=>x.id===id);
+    if(!d||!d.skladniki)return;
+    const porcje=zakSelected[id]||1;
+    dania.push({nazwa:d.nazwa,porcje});
+    d.skladniki.forEach(sk=>{
+      const key=sk.nazwa;
+      skladniki[key]=(skladniki[key]||0)+(sk.waga*porcje);
+    });
+  });
+
+  // Posortuj składniki alfabetycznie
+  const sorted=Object.entries(skladniki).sort((a,b)=>a[0].localeCompare(b[0],'pl'));
+
+  // Dla każdego składnika - sprawdź cenę z bazy produktów
+  let totalKoszt=0;
+  let rows='';
+  sorted.forEach(([nazwa,waga])=>{
+    const prod=PR.find(p=>!p.deleted_at&&p.nazwa===nazwa);
+    const cenaZaG=prod?c1g(prod):0;
+    const koszt=cenaZaG*waga;
+    totalKoszt+=koszt;
+    // Formatuj wagę - kg jeśli >1000g
+    const wagaStr=waga>=1000?`${(waga/1000).toFixed(2)} kg`:`${Math.round(waga)} g`;
+    rows+=`<div style="display:flex;justify-content:space-between;align-items:center;
+      padding:8px 0;border-bottom:1px solid var(--bo)">
+      <div style="flex:1">
+        <span style="font-weight:600;font-size:.85rem">${nazwa}</span>
+        ${!prod?'<span style="color:var(--red);font-size:.7rem;margin-left:6px">⚠ brak w bazie</span>':''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700;color:var(--ac);font-size:.85rem">${wagaStr}</div>
+        ${koszt>0?`<div style="font-size:.72rem;color:var(--mu)">${koszt.toFixed(2)} zł</div>`:''}
+      </div>
+    </div>`;
+  });
+
+  const daniaList=dania.map(d=>`${d.nazwa} ×${d.porcje}`).join(', ');
+  wynik.innerHTML=`
+    <div style="font-size:.78rem;color:var(--mu);margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--bo)">
+      <strong>Dania:</strong> ${daniaList}
+    </div>
+    ${rows}
+    <div style="display:flex;justify-content:space-between;align-items:center;
+      margin-top:14px;padding-top:12px;border-top:2px solid var(--ac)">
+      <strong style="font-size:.95rem">Szacowany koszt zakupów:</strong>
+      <strong style="font-size:1.2rem;color:var(--ac)">${totalKoszt.toFixed(2)} zł</strong>
+    </div>`;
+
+  window._zakResult={dania,skladniki:sorted,totalKoszt};
+}
+
+function exportZakupy(){
+  const r=window._zakResult;
+  if(!r||!r.skladniki.length){nt('Lista jest pusta');return;}
+  const esc=v=>{const s=String(v??'').replace(/"/g,'""');return /[;"\n]/.test(s)?`"${s}"`:s;};
+  const rows=['Składnik;Ilość;Koszt (zł)'];
+  r.skladniki.forEach(([nazwa,waga])=>{
+    const prod=PR.find(p=>!p.deleted_at&&p.nazwa===nazwa);
+    const koszt=prod?(c1g(prod)*waga):0;
+    const wagaStr=waga>=1000?`${(waga/1000).toFixed(3).replace('.',',')} kg`:`${Math.round(waga)} g`;
+    rows.push([esc(nazwa),esc(wagaStr),String(koszt.toFixed(2)).replace('.',',')].join(';'));
+  });
+  rows.push(`;;`);
+  rows.push(`RAZEM;;${String(r.totalKoszt.toFixed(2)).replace('.',',')}`);
+  const csv='\uFEFF'+rows.join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const dateStr=new Date().toLocaleDateString('pl-PL').replace(/\./g,'-');
+  a.href=url;a.download=`Lista_zakupow_${dateStr}.csv`;a.click();
+  URL.revokeObjectURL(url);
+  nt('📤 Lista zakupów wyeksportowana');
+}
+
+function printZakupy(){
+  const r=window._zakResult;
+  if(!r||!r.skladniki.length){nt('Lista jest pusta');return;}
+  const daniaList=r.dania.map(d=>`${d.nazwa} ×${d.porcje}`).join(', ');
+  let items='';
+  r.skladniki.forEach(([nazwa,waga])=>{
+    const wagaStr=waga>=1000?`${(waga/1000).toFixed(2)} kg`:`${Math.round(waga)} g`;
+    items+=`<tr><td style="padding:6px 0;border-bottom:1px solid #ddd">☐ ${nazwa}</td>
+      <td style="padding:6px 0;border-bottom:1px solid #ddd;text-align:right;font-weight:bold">${wagaStr}</td></tr>`;
+  });
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Lista zakupów</title>
+    <style>body{font-family:Arial,sans-serif;max-width:600px;margin:20px auto;padding:20px}
+    h1{font-size:1.4rem}table{width:100%;border-collapse:collapse}
+    .meta{color:#666;font-size:.85rem;margin-bottom:16px}</style></head>
+    <body><h1>🛒 Lista zakupów</h1>
+    <div class="meta">${new Date().toLocaleDateString('pl-PL')} — ${daniaList}</div>
+    <table>${items}</table>
+    <div style="margin-top:20px;padding-top:12px;border-top:2px solid #000;text-align:right;font-size:1.1rem">
+      <strong>Szacowany koszt: ${r.totalKoszt.toFixed(2)} zł</strong></div>
+    </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(),300);
+}
+
 // Debounce dla wyszukiwarek - nie przebudowuj tabeli przy każdym klawiszu
 let _searchTimers={};
 function debSearch(fn,key){
