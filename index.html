@@ -214,7 +214,6 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     <button class="nb" onclick="ST('opakowania',this)">📦 Baza Opakowań</button>
     <button class="nb" onclick="ST('baza-odz',this)">🥗 Baza Wartości Odżywczych</button>
     <button class="nb" onclick="ST('baza-fc',this)">📊 Baza Food Cost</button>
-    <button class="nb" onclick="ST('zakupy',this)">🛒 Lista Zakupów</button>
     <button class="nb" onclick="ST('xml-import',this)">🧾 Import XML Faktury</button>
   </nav>
   <div class="cnt">
@@ -608,51 +607,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     </div>
   </div>
 </div>
-<!-- LISTA ZAKUPÓW -->
-    <div class="tab" id="tab-zakupy">
-      <p class="pt">Lista Zakupów</p>
-      <p class="ps">Zaznacz dania które planujesz przygotować i ile porcji — aplikacja zsumuje wszystkie potrzebne składniki.</p>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
-        <!-- LEWA: wybór dań -->
-        <div>
-          <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
-            <strong style="font-size:.9rem">Wybierz dania</strong>
-            <input type="text" id="zak-search" placeholder="🔍 Szukaj…" style="width:160px" oninput="debSearch(renZakDania,'zak')">
-            <button class="btn br sm" onclick="clearZak()">✕ Wyczyść</button>
-          </div></div>
-          <div class="tbl-wrap" style="max-height:60vh;overflow-y:auto">
-            <table>
-              <thead><tr>
-                <th style="width:40px"></th>
-                <th>Danie</th>
-                <th style="width:90px">Porcje</th>
-              </tr></thead>
-              <tbody id="zak-dania-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- PRAWA: lista składników -->
-        <div>
-          <div class="sh"><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;justify-content:space-between;width:100%">
-            <strong style="font-size:.9rem">🛒 Potrzebne składniki</strong>
-            <div style="display:flex;gap:6px">
-              <button class="btn sm" onclick="exportZakupy()" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport</button>
-              <button class="btn sm" onclick="printZakupy()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">🖨 Drukuj</button>
-            </div>
-          </div></div>
-          <div id="zak-wynik" style="background:var(--s);border:1px solid var(--bo);border-radius:10px;padding:16px;min-height:200px">
-            <div style="text-align:center;color:var(--mu);padding:40px 20px">
-              <div style="font-size:2.5rem;margin-bottom:10px">🛒</div>
-              <div style="font-size:.9rem">Zaznacz dania po lewej stronie</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- MODAL NOWEGO PRODUKTU -->
+<!-- MODAL NOWEGO PRODUKTU -->
 <div class="confirm-overlay" id="prod-modal" style="display:none" onclick="if(event.target===this)closeProdModal()">
   <div class="confirm-box" style="max-width:560px">
     <div class="confirm-hdr">
@@ -813,7 +768,6 @@ function ST(n,b){
   document.querySelectorAll('.nb').forEach(x=>x.classList.remove('active'));
   document.getElementById('tab-'+n).classList.add('active');
   if(b)b.classList.add('active');
-  if(n==='zakupy'){renZakDania();calcZakupy();}
   if(n==='opakowania')renOpak();
   if(n==='baza-odz')renBO();
   if(n==='baza-fc')renBF();
