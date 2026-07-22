@@ -212,6 +212,36 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
 </style>
 </head>
 <body>
+<!-- EKRAN LOGOWANIA -->
+<div id="login-screen" style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--s);border:2px solid var(--ac);border-radius:14px;padding:32px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:2.5rem;margin-bottom:8px">🍽</div>
+      <h1 style="font-family:'DM Serif Display',serif;font-size:1.8rem;color:var(--ac);margin:0">Śniadaniowcy</h1>
+      <p style="color:var(--mu);font-size:.85rem;margin:6px 0 0">Zaloguj się aby kontynuować</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label style="display:block;font-size:.78rem;color:var(--mu);margin-bottom:4px">Email</label>
+        <input type="email" id="login-email" placeholder="twoj@email.pl" autocomplete="email"
+          style="width:100%;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bo);border-radius:8px;color:var(--tx);font-size:.9rem;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="display:block;font-size:.78rem;color:var(--mu);margin-bottom:4px">Hasło</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()"
+          style="width:100%;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bo);border-radius:8px;color:var(--tx);font-size:.9rem;box-sizing:border-box">
+      </div>
+      <div id="login-error" style="display:none;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:var(--red);padding:8px 12px;border-radius:6px;font-size:.8rem"></div>
+      <button id="login-btn" onclick="doLogin()"
+        style="background:var(--ac);color:#1a1a1a;border:none;border-radius:8px;padding:12px;font-size:.95rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:6px">
+        Zaloguj
+      </button>
+    </div>
+  </div>
+</div>
+
+
 <div class="lo" id="lo"><div class="sp2"></div>Łączenie z bazą danych…</div>
 <div class="app">
   <div class="hdr">
@@ -219,6 +249,12 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
     <span style="opacity:.6;font-size:.82rem;color:var(--tx)">Kalkulator Wartości Odżywczych &amp; Food Cost</span>
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
       <div class="dot" id="dot"></div><span class="clb" id="clb" style="color:var(--mu)">łączenie…</span>
+      <button onclick="logout()" title="Wyloguj się"
+        style="background:var(--s2);border:1px solid var(--bo);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--mu);font-size:.75rem;font-family:'DM Sans',sans-serif;margin-left:8px"
+        onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'"
+        onmouseout="this.style.color='var(--mu)';this.style.borderColor='var(--bo)'">
+        🚪 Wyloguj
+      </button>
     </div>
   </div>
   <nav class="nav">
@@ -753,7 +789,112 @@ async function ins(t,d){
 }
 
 
-async function init(){
+// ══════════════════════════════════════════════
+// AUTORYZACJA (Supabase Auth)
+// ══════════════════════════════════════════════
+let AUTH_TOKEN = null;
+let AUTH_USER = null;
+
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const errEl=document.getElementById('login-error');
+  const btn=document.getElementById('login-btn');
+  if(!email||!password){
+    errEl.textContent='Podaj email i hasło';errEl.style.display='block';return;
+  }
+  btn.textContent='⏳ Loguję…';btn.disabled=true;errEl.style.display='none';
+  try{
+    const r=await fetch(`${SU}/auth/v1/token?grant_type=password`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SK},
+      body:JSON.stringify({email,password})
+    });
+    const data=await r.json();
+    if(!r.ok){
+      const msg=data.error_description||data.msg||data.error||'Błąd logowania';
+      errEl.textContent='❌ '+msg;errEl.style.display='block';
+      btn.textContent='Zaloguj';btn.disabled=false;
+      return;
+    }
+    // Zapisz sesję
+    AUTH_TOKEN=data.access_token;
+    AUTH_USER=data.user;
+    localStorage.setItem('sn_auth',JSON.stringify({
+      token:data.access_token,
+      refresh:data.refresh_token,
+      expires_at:Date.now()+(data.expires_in*1000),
+      user:data.user
+    }));
+    // Zaktualizuj nagłówki (użyj Bearer token zamiast anon key dla API calls)
+    H['Authorization']='Bearer '+AUTH_TOKEN;
+    // Ukryj ekran logowania i uruchom aplikację
+    document.getElementById('login-screen').style.display='none';
+    initApp();
+  }catch(e){
+    console.error('Login error:',e);
+    errEl.textContent='❌ Błąd połączenia — sprawdź internet';
+    errEl.style.display='block';
+    btn.textContent='Zaloguj';btn.disabled=false;
+  }
+}
+
+async function checkAuth(){
+  // Sprawdź czy jest zapisana sesja
+  try{
+    const saved=localStorage.getItem('sn_auth');
+    if(!saved) return false;
+    const s=JSON.parse(saved);
+    // Sprawdź czy nie wygasła
+    if(s.expires_at && s.expires_at<Date.now()){
+      // Spróbuj odświeżyć
+      const r=await fetch(`${SU}/auth/v1/token?grant_type=refresh_token`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':SK},
+        body:JSON.stringify({refresh_token:s.refresh})
+      });
+      if(!r.ok){localStorage.removeItem('sn_auth');return false;}
+      const data=await r.json();
+      AUTH_TOKEN=data.access_token;
+      AUTH_USER=data.user;
+      localStorage.setItem('sn_auth',JSON.stringify({
+        token:data.access_token,
+        refresh:data.refresh_token,
+        expires_at:Date.now()+(data.expires_in*1000),
+        user:data.user
+      }));
+    } else {
+      AUTH_TOKEN=s.token;
+      AUTH_USER=s.user;
+    }
+    H['Authorization']='Bearer '+AUTH_TOKEN;
+    return true;
+  }catch(e){
+    console.error('checkAuth error:',e);
+    return false;
+  }
+}
+
+function logout(){
+  localStorage.removeItem('sn_auth');
+  AUTH_TOKEN=null;
+  AUTH_USER=null;
+  location.reload();
+}
+
+// Uruchom sprawdzenie autoryzacji przy starcie
+(async function(){
+  const loggedIn=await checkAuth();
+  if(loggedIn){
+    document.getElementById('login-screen').style.display='none';
+    initApp();
+  } else {
+    // Pokaż ekran logowania (już widoczny w HTML)
+    setTimeout(()=>document.getElementById('login-email')?.focus(),100);
+  }
+})();
+
+async function initApp(){
   if(SU.includes('WPISZ')){
     document.getElementById('lo').innerHTML='<div style="text-align:center;padding:30px;max-width:460px"><div style="font-size:2rem;margin-bottom:12px">⚙️</div><div style="font-family:DM Serif Display,serif;font-size:1.3rem;color:#7B4F2E;margin-bottom:10px">Uzupełnij dane Supabase</div><div style="font-size:.88rem;color:#888;line-height:1.7">Otwórz plik <strong>NutriCalc.html</strong> w Notatniku lub VS Code.<br>Znajdź sekcję <strong>KONFIGURACJA SUPABASE</strong>.<br>Wpisz swój <strong>Project URL</strong> i <strong>anon public key</strong><br>z panelu Supabase → Settings → API.</div></div>';
     return;
@@ -3075,7 +3216,7 @@ async function moveToFolder(type, id, folderName){
   nt(`📁 "${item.nazwa}" przeniesione`);
 }
 
-init();
+// init() nie jest już wywoływane automatycznie - uruchamia się po logowaniu przez initApp()
 </script>
 </body>
 </html>
