@@ -129,6 +129,17 @@ tbody td{padding:6px 10px;vertical-align:middle;overflow:hidden}
 .mfoot{padding:12px 22px 16px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--bo);background:var(--s2)}
 .map-row{display:grid;grid-template-columns:180px 30px 220px;align-items:center;gap:8px;margin-bottom:8px;font-size:.85rem}
 
+/* ZAGNIEŻDŻONE SKŁADNIKI */
+.kr.is-group{background:rgba(237,179,19,.06);border-left:3px solid var(--ac);border-radius:6px}
+.kr.is-sub{margin-left:28px;border-left:2px dashed rgba(237,179,19,.3);padding-left:8px}
+.kr.is-sub .aw input{font-size:.8rem}
+.group-label{font-size:.68rem;color:var(--ac);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.sub-label{font-size:.66rem;color:var(--mu)}
+.btn-add-sub{background:rgba(237,179,19,.12)!important;border:1px solid rgba(237,179,19,.3)!important;
+  color:var(--ac)!important;font-size:.7rem!important;padding:3px 8px!important;border-radius:5px;cursor:pointer;white-space:nowrap}
+.btn-make-group{background:rgba(62,207,142,.12)!important;border:1px solid rgba(62,207,142,.3)!important;
+  color:var(--green)!important;font-size:.7rem!important;padding:3px 8px!important;border-radius:5px;cursor:pointer;white-space:nowrap}
+
 /* TOOLTIP PRODUKTU W KALKULATORZE */
 .prod-tooltip{position:fixed;z-index:3000;background:var(--s);border:2px solid var(--ac);
   border-radius:10px;padding:14px 16px;max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.6);
@@ -1158,14 +1169,108 @@ Możesz je przywrócić w ciągu 30 dni.`))return;
 }
 
 let kR=[];
-function iK(){kR=[];document.getElementById('kr').innerHTML='';for(let i=0;i<10;i++)aKR();}
-function aKR(){
-  const id='r'+Date.now()+Math.random().toString(36).slice(2);kR.push({id,n:'',w:0});
-  const d=document.createElement('div');d.className='kr';d.dataset.id=id;
-  d.innerHTML=`<div class="aw"><input type="text" placeholder="Nazwa składnika…" autocomplete="off" oninput="kI(this,'${id}')" onfocus="kI(this,'${id}')" onmouseenter="showProdTooltip(this)" onmouseleave="hideProdTooltip()" onmousemove="moveProdTooltip(event)" style="font-size:.84rem"></div><input type="number" placeholder="waga (g)" min="0" step="0.1" oninput="kW(this,'${id}')" style="font-size:.84rem"><button onclick="rKR('${id}')" style="background:var(--s2);border:none;border-radius:6px;cursor:pointer;font-size:.95rem;color:var(--mu);padding:4px 7px">✕</button>`;
-  document.getElementById('kr').appendChild(d);
+function iK(){
+  kR=[];
+  document.getElementById('kr').innerHTML='';
+  for(let i=0;i<10;i++){
+    const id='r'+Date.now()+Math.random().toString(36).slice(2)+i;
+    kR.push({id,n:'',w:0,parent:null,isGroup:false});
+  }
+  renderKalkRows();
 }
-function rKR(id){kR=kR.filter(r=>r.id!==id);document.querySelector(`.kr[data-id="${id}"]`)?.remove();rc();}
+function aKR(parentId){
+  const id='r'+Date.now()+Math.random().toString(36).slice(2);
+  const row={id,n:'',w:0,parent:parentId||null,isGroup:false};
+  kR.push(row);
+  renderKalkRows();
+  return id;
+}
+
+// Renderuj wszystkie wiersze kalkulatora z zachowaniem hierarchii
+function renderKalkRows(){
+  const cont=document.getElementById('kr');
+  if(!cont)return;
+  // Zapamiętaj wartości z inputów przed przerysowaniem
+  cont.innerHTML='';
+
+  // Ułóż: najpierw wiersze główne, pod każdym jego podskładniki
+  const mainRows=kR.filter(r=>!r.parent);
+  mainRows.forEach(row=>{
+    cont.appendChild(buildKalkRow(row));
+    // Podskładniki tej grupy
+    if(row.isGroup){
+      kR.filter(r=>r.parent===row.id).forEach(sub=>{
+        cont.appendChild(buildKalkRow(sub));
+      });
+      // Przycisk "dodaj podskładnik" pod grupą
+      const addBtn=document.createElement('div');
+      addBtn.style.cssText='margin-left:28px;margin-bottom:8px';
+      addBtn.innerHTML=`<button class="btn-add-sub" onclick="aKR('${row.id}')">↳ dodaj podskładnik do „${(row.n||'grupy').substring(0,20)}"</button>`;
+      cont.appendChild(addBtn);
+    }
+  });
+}
+
+function buildKalkRow(row){
+  const d=document.createElement('div');
+  d.className='kr'+(row.isGroup?' is-group':'')+(row.parent?' is-sub':'');
+  d.dataset.id=row.id;
+
+  const label = row.isGroup
+    ? `<div class="group-label">📦 Składnik złożony</div>`
+    : row.parent
+      ? `<div class="sub-label">↳ podskładnik</div>`
+      : '';
+
+  // Przyciski akcji zależne od typu
+  let actionBtns='';
+  if(!row.parent && !row.isGroup){
+    // Zwykły wiersz - może stać się grupą
+    actionBtns=`<button class="btn-make-group" onclick="makeGroup('${row.id}')" title="Zmień w składnik złożony (z podskładnikami)">⊞ złożony</button>`;
+  }
+
+  d.innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:2px;flex:1">
+      ${label}
+      <div style="display:flex;gap:6px;align-items:center">
+        <div class="aw" style="flex:1;position:relative">
+          <input type="text" placeholder="${row.isGroup?'Nazwa składnika złożonego (np. Filet panierowany)':'Nazwa składnika…'}"
+            value="${(row.n||'').replace(/"/g,'&quot;')}" autocomplete="off"
+            oninput="kI(this,'${row.id}')" onfocus="kI(this,'${row.id}')"
+            onmouseenter="showProdTooltip(this)" onmouseleave="hideProdTooltip()" onmousemove="moveProdTooltip(event)"
+            style="font-size:${row.parent?'.8rem':'.84rem'};width:100%">
+        </div>
+        ${row.isGroup?'<span style="font-size:.72rem;color:var(--mu);width:90px;text-align:center">(suma podskł.)</span>':
+          `<input type="number" placeholder="waga (g)" min="0" step="0.1" value="${row.w||''}"
+            oninput="kW(this,'${row.id}')" style="font-size:.84rem;width:90px">`}
+        ${actionBtns}
+        <button onclick="rKR('${row.id}')" style="background:var(--s2);border:none;border-radius:6px;cursor:pointer;font-size:.95rem;color:var(--mu);padding:4px 7px">✕</button>
+      </div>
+    </div>`;
+  return d;
+}
+
+function makeGroup(id){
+  const row=kR.find(r=>r.id===id);
+  if(!row)return;
+  row.isGroup=true;
+  row.w=0; // grupa nie ma własnej wagi
+  renderKalkRows();
+  rc();
+  // Od razu dodaj pierwszy podskładnik
+  aKR(id);
+}
+function rKR(id){
+  const row=kR.find(r=>r.id===id);
+  // Jeśli usuwamy grupę - usuń też jej podskładniki
+  if(row&&row.isGroup){
+    kR=kR.filter(r=>r.id!==id&&r.parent!==id);
+  } else {
+    kR=kR.filter(r=>r.id!==id);
+  }
+  renderKalkRows();
+  rc();
+}
 function kI(el,id){
   const q=el.value.toLowerCase(),row=kR.find(r=>r.id===id);if(row)row.n=el.value;
   document.querySelectorAll('.ad').forEach(d=>d.remove());
@@ -1176,14 +1281,59 @@ function kI(el,id){
   w.appendChild(dd);el.onblur=()=>setTimeout(()=>dd.remove(),150);
 }
 function kW(el,id){const row=kR.find(r=>r.id===id);if(row)row.w=parseFloat(el.value)||0;rc();}
+// Buduj skład etykiety z hierarchią (grupy i podskładniki)
+function buildHierarchSklad(){
+  const pd={};PR.filter(p=>!p.deleted_at).forEach(p=>pd[p.nazwa]=p);
+
+  // Funkcja: skład pojedynczego produktu jako "NAZWA [SKŁAD]" lub "NAZWA"
+  const prodSklad=(nazwa)=>{
+    const p=pd[nazwa];
+    if(!p) return nazwa;
+    const s=(p.pelny_sklad||'').toUpperCase();
+    return s&&s!=='0' ? `${p.nazwa} [${s}]` : p.nazwa;
+  };
+
+  // Zbierz elementy w kolejności: grupy z podskładnikami, luźne składniki
+  // Sortuj główne wg łącznej wagi (grupa = suma podskładników)
+  const items=[];
+
+  kR.filter(r=>!r.parent).forEach(row=>{
+    if(row.isGroup){
+      // Grupa: nazwa [podskładnik1 [skład], podskładnik2 [skład]]
+      const subs=kR.filter(r=>r.parent===row.id&&r.n&&r.w>0);
+      if(!subs.length && !row.n) return;
+      const subWaga=subs.reduce((s,x)=>s+x.w,0);
+      const subSklad=subs.map(s=>prodSklad(s.n)).join(', ');
+      const grupaNazwa=row.n||'Składnik złożony';
+      items.push({
+        waga:subWaga,
+        text: subSklad ? `${grupaNazwa} [${subSklad}]` : grupaNazwa
+      });
+    } else {
+      // Zwykły składnik
+      if(!row.n||row.w<=0) return;
+      items.push({ waga:row.w, text:prodSklad(row.n) });
+    }
+  });
+
+  // Sortuj malejąco wg wagi (wymóg prawny - składniki wg masy)
+  items.sort((a,b)=>b.waga-a.waga);
+  return items.map(i=>i.text).join(', ');
+}
+
 function gKD(){
   const pd={};PR.filter(p=>!p.deleted_at).forEach(p=>pd[p.nazwa]=p);
   let t={wg:0,kc:0,tl:0,tn:0,we:0,cu:0,bi:0,so:0,ko:0};const us=[];
-  kR.forEach(r=>{if(!r.n||r.w<=0)return;const p=pd[r.n];if(!p)return;const w=r.w;
+  // Grupy (isGroup) pomijamy w liczeniu - liczymy tylko realne składniki i podskładniki z wagą
+  kR.forEach(r=>{
+    if(r.isGroup)return; // grupa to tylko nagłówek, nie liczymy
+    if(!r.n||r.w<=0)return;
+    const p=pd[r.n];if(!p)return;const w=r.w;
     t.wg+=w;t.kc+=(parseFloat(p.kcal)||0)*w/100;t.tl+=(parseFloat(p.tluszcze)||0)*w/100;
     t.tn+=(parseFloat(p.tluszcze_nas)||0)*w/100;t.we+=(parseFloat(p.weglowodany)||0)*w/100;
     t.cu+=(parseFloat(p.cukry)||0)*w/100;t.bi+=(parseFloat(p.bialka)||0)*w/100;
-    t.so+=(parseFloat(p.sole)||0)*w/100;t.ko+=c1g(p)*w;us.push({p,w});});
+    t.so+=(parseFloat(p.sole)||0)*w/100;t.ko+=c1g(p)*w;us.push({p,w});
+  });
   return{t,us};
 }
 function rc(){
@@ -1195,7 +1345,7 @@ function rc(){
   s('pw',nf(t.we/wg*100)+' g');s('pcu',nf(t.cu/wg*100)+' g');s('pbi',nf(t.bi/wg*100)+' g');
   s('pso',nf(t.so/wg*100,3)+' g');s('pko',zl(t.ko));
   const sr=[...us].sort((a,b)=>b.w-a.w);
-  document.getElementById('st').textContent=sr.map(({p})=>{const sk=(p.pelny_sklad||'').toUpperCase();return sk&&sk!=='0'?`${p.nazwa} [${sk}]`:p.nazwa;}).join(', ')||'—';
+  document.getElementById('st').textContent=buildHierarchSklad()||'—';
   const aS=new Set(),mS=new Set();
   sr.forEach(({p})=>{
     (p.alergeny||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>aS.add(a));
@@ -1929,8 +2079,37 @@ async function doSave(tg, nz, overwrite){
     (p.moze_zawierac||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>mS.add(a));
   });
   const sr=[...us].sort((a,b)=>b.w-a.w);
-  const sk=sr.map(({p})=>{const s=(p.pelny_sklad||'').toUpperCase();return s&&s!=='0'?`${p.nazwa} [${s}]`:p.nazwa;}).join(', ');
-  const skl=sr.map(({p,w})=>({nazwa:p.nazwa,waga:w}));
+  const sk=buildHierarchSklad();
+  // Zapisz składniki z zachowaniem struktury zagnieżdżenia
+  const skl=[];
+  kR.forEach((r,idx)=>{
+    if(r.isGroup){
+      // Grupa - zapisz jako nagłówek
+      skl.push({nazwa:r.n||'Składnik złożony',waga:0,isGroup:true,_idx:idx});
+    } else if(r.n && r.w>0){
+      // Znajdź indeks rodzica w kR
+      let parentIdx=null;
+      if(r.parent){
+        parentIdx=kR.findIndex(x=>x.id===r.parent);
+        if(parentIdx<0)parentIdx=null;
+      }
+      skl.push({nazwa:r.n,waga:r.w,parent:r.parent||null,parentIdx:parentIdx});
+    }
+  });
+  // Przelicz parentIdx na indeks w tablicy skl (nie kR)
+  const kRtoSkl={};
+  let skIdx=0;
+  kR.forEach((r,idx)=>{
+    if(r.isGroup||(r.n&&r.w>0)){ kRtoSkl[idx]=skIdx; skIdx++; }
+  });
+  skl.forEach(s=>{
+    if(s.parentIdx!==null&&s.parentIdx!==undefined&&kRtoSkl[s.parentIdx]!==undefined){
+      s.parentIdx=kRtoSkl[s.parentIdx];
+    } else {
+      s.parentIdx=null;
+    }
+    delete s._idx;
+  });
   const td=new Date().toLocaleDateString('pl-PL');
   if(tg==='odz'||tg==='both'){
     const e={nazwa:nz,data:td,waga_g:t.wg,kcal100:t.kc/wg*100,tl100:t.tl/wg*100,tlnas100:t.tn/wg*100,weg100:t.we/wg*100,cukry100:t.cu/wg*100,bialka100:t.bi/wg*100,sol100:t.so/wg*100,alergeny:[...aS].join(', ')||'Brak',moze_zawierac:[...mS].join(', ')||'Brak',sklad_etykieta:sk,skladniki:skl};
@@ -2173,13 +2352,33 @@ function ltk(t){
   const c=document.querySelector(`.${cn}:checked`);if(!c){alert('Zaznacz danie do wczytania');return;}
   const baza=t==='odz'?BO:BF;const d=baza.find(x=>x.id===c.dataset.id);
   if(!d||!d.skladniki)return;
-  iK();document.getElementById('sn').value=d.nazwa;
+  document.getElementById('sn').value=d.nazwa;
+  // Odtwórz strukturę składników (z grupami i podskładnikami jeśli zapisane)
+  kR=[];
   d.skladniki.forEach((sk,i)=>{
-    while(kR.length<=i)aKR();
-    const rows=document.querySelectorAll('.kr');const row=rows[i];if(!row)return;
-    const inp=row.querySelector('input[type="text"]'),winp=row.querySelector('input[type="number"]');
-    if(inp){inp.value=sk.nazwa;kR[i].n=sk.nazwa;}if(winp){winp.value=sk.waga;kR[i].w=sk.waga;}
+    const id='r'+Date.now()+Math.random().toString(36).slice(2)+i;
+    kR.push({
+      id,
+      n:sk.nazwa||'',
+      w:sk.waga||0,
+      parent:sk.parent||null,  // odtwórz relację jeśli była zapisana
+      isGroup:sk.isGroup||false,
+      _origParent:sk.parentIdx  // tymczasowo indeks rodzica
+    });
   });
+  // Napraw relacje parent po indeksach (bo id się zmieniły)
+  kR.forEach(r=>{
+    if(r._origParent!==undefined && r._origParent!==null && kR[r._origParent]){
+      r.parent=kR[r._origParent].id;
+    }
+    delete r._origParent;
+  });
+  // Dopełnij do min 10 wierszy
+  while(kR.length<10){
+    const id='r'+Date.now()+Math.random().toString(36).slice(2)+kR.length;
+    kR.push({id,n:'',w:0,parent:null,isGroup:false});
+  }
+  renderKalkRows();
   if(t==='fc'&&d.fc_params){const fc=d.fc_params;
     document.getElementById('fs').value=fc.stawka||23;
     document.getElementById('fc2').value=fc.czas||5;
