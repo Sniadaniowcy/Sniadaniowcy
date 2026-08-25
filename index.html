@@ -2106,8 +2106,9 @@ async function doSave(tg, nz, overwrite){
   const skl=[];
   kR.forEach((r,idx)=>{
     if(r.isGroup){
-      // Grupa - zapisz jako nagłówek
-      skl.push({nazwa:r.n||'Składnik złożony',waga:0,isGroup:true,_idx:idx});
+      // Grupa MA swoją wagę (główny składnik, np. surowy filet 100g)
+      if(!r.n) return; // pomiń puste grupy bez nazwy
+      skl.push({nazwa:r.n,waga:r.w||0,isGroup:true,_idx:idx});
     } else if(r.n && r.w>0){
       // Znajdź indeks rodzica w kR
       let parentIdx=null;
@@ -2122,7 +2123,7 @@ async function doSave(tg, nz, overwrite){
   const kRtoSkl={};
   let skIdx=0;
   kR.forEach((r,idx)=>{
-    if(r.isGroup||(r.n&&r.w>0)){ kRtoSkl[idx]=skIdx; skIdx++; }
+    if((r.isGroup&&r.n)||(r.n&&r.w>0)){ kRtoSkl[idx]=skIdx; skIdx++; }
   });
   skl.forEach(s=>{
     if(s.parentIdx!==null&&s.parentIdx!==undefined&&kRtoSkl[s.parentIdx]!==undefined){
