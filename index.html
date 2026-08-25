@@ -1240,9 +1240,8 @@ function buildKalkRow(row){
             onmouseenter="showProdTooltip(this)" onmouseleave="hideProdTooltip()" onmousemove="moveProdTooltip(event)"
             style="font-size:${row.parent?'.8rem':'.84rem'};width:100%">
         </div>
-        ${row.isGroup?'<span style="font-size:.72rem;color:var(--mu);width:90px;text-align:center">(suma podskł.)</span>':
-          `<input type="number" placeholder="waga (g)" min="0" step="0.1" value="${row.w||''}"
-            oninput="kW(this,'${row.id}')" style="font-size:.84rem;width:90px">`}
+        <input type="number" placeholder="waga (g)" min="0" step="0.1" value="${row.w||''}"
+          oninput="kW(this,'${row.id}')" style="font-size:.84rem;width:90px">
         ${actionBtns}
         <button onclick="rKR('${row.id}')" style="background:var(--s2);border:none;border-radius:6px;cursor:pointer;font-size:.95rem;color:var(--mu);padding:4px 7px">✕</button>
       </div>
@@ -1254,7 +1253,7 @@ function makeGroup(id){
   const row=kR.find(r=>r.id===id);
   if(!row)return;
   row.isGroup=true;
-  row.w=0; // grupa nie ma własnej wagi
+  // Grupa ZACHOWUJE swoją wagę (np. surowy filet 100g) - nie zerujemy
   renderKalkRows();
   rc();
   // Od razu dodaj pierwszy podskładnik
@@ -1299,16 +1298,34 @@ function buildHierarchSklad(){
 
   kR.filter(r=>!r.parent).forEach(row=>{
     if(row.isGroup){
-      // Grupa: nazwa [podskładnik1 [skład], podskładnik2 [skład]]
+      // Grupa = główny składnik (np. surowy filet) z własnym składem
+      // + podskładniki dodane w trakcie (panierka, sos) zagnieżdżone
+      if(!row.n||row.w<=0){
+        // Grupa bez nazwy/wagi - pokaż tylko podskładniki jeśli są
+        const subs=kR.filter(r=>r.parent===row.id&&r.n&&r.w>0);
+        if(!subs.length) return;
+        const subWaga=subs.reduce((s,x)=>s+x.w,0);
+        const subSklad=subs.map(s=>prodSklad(s.n)).join(', ');
+        items.push({waga:subWaga, text:subSklad});
+        return;
+      }
+      // Główny składnik grupy ma swój pełny skład
+      const glownySklad=prodSklad(row.n); // np. "Filet [MIĘSO...]" lub "Filet"
+      // Podskładniki
       const subs=kR.filter(r=>r.parent===row.id&&r.n&&r.w>0);
-      if(!subs.length && !row.n) return;
-      const subWaga=subs.reduce((s,x)=>s+x.w,0);
       const subSklad=subs.map(s=>prodSklad(s.n)).join(', ');
-      const grupaNazwa=row.n||'Składnik złożony';
-      items.push({
-        waga:subWaga,
-        text: subSklad ? `${grupaNazwa} [${subSklad}]` : grupaNazwa
-      });
+      // Waga grupy = główny składnik + podskładniki (do sortowania)
+      const totalWaga=row.w+subs.reduce((s,x)=>s+x.w,0);
+      // Format: "Filet [MIĘSO...], PANIERKA [...], SOS [...]"
+      // Główny składnik i jego dodatki jako jedna grupa na etykiecie
+      let text;
+      if(subSklad){
+        // Wyciągnij nazwę głównego składnika i jego skład osobno
+        text = `${glownySklad}, ${subSklad}`;
+      } else {
+        text = glownySklad;
+      }
+      items.push({waga:totalWaga, text, isGroupText:true});
     } else {
       // Zwykły składnik
       if(!row.n||row.w<=0) return;
@@ -1324,9 +1341,9 @@ function buildHierarchSklad(){
 function gKD(){
   const pd={};PR.filter(p=>!p.deleted_at).forEach(p=>pd[p.nazwa]=p);
   let t={wg:0,kc:0,tl:0,tn:0,we:0,cu:0,bi:0,so:0,ko:0};const us=[];
-  // Grupy (isGroup) pomijamy w liczeniu - liczymy tylko realne składniki i podskładniki z wagą
+  // Grupy TEŻ się liczą (mają własną wagę - np. surowy filet 100g)
+  // Podskładniki (panierka, sos) też się liczą osobno
   kR.forEach(r=>{
-    if(r.isGroup)return; // grupa to tylko nagłówek, nie liczymy
     if(!r.n||r.w<=0)return;
     const p=pd[r.n];if(!p)return;const w=r.w;
     t.wg+=w;t.kc+=(parseFloat(p.kcal)||0)*w/100;t.tl+=(parseFloat(p.tluszcze)||0)*w/100;
