@@ -1309,21 +1309,26 @@ function buildHierarchSklad(){
         items.push({waga:subWaga, text:subSklad});
         return;
       }
-      // Główny składnik grupy ma swój pełny skład
-      const glownySklad=prodSklad(row.n); // np. "Filet [MIĘSO...]" lub "Filet"
-      // Podskładniki
+      // Główny składnik grupy - jego pełny skład (bez nazwy, bo nazwa grupy jest na zewnątrz)
+      const glowny=pd[row.n];
+      const glownySkladWewn = glowny ? (glowny.pelny_sklad||'').toUpperCase() : '';
+      // Podskładniki (panierka, sos) - każdy jako "NAZWA [SKŁAD]"
       const subs=kR.filter(r=>r.parent===row.id&&r.n&&r.w>0);
       const subSklad=subs.map(s=>prodSklad(s.n)).join(', ');
       // Waga grupy = główny składnik + podskładniki (do sortowania)
       const totalWaga=row.w+subs.reduce((s,x)=>s+x.w,0);
-      // Format: "Filet [MIĘSO...], PANIERKA [...], SOS [...]"
-      // Główny składnik i jego dodatki jako jedna grupa na etykiecie
+      // FORMAT: wszystko w JEDNYM nawiasie
+      // "Filet z kurczaka [SKŁAD FILETA, PANIERKA [BUŁKA TARTA...], SOS [...]]"
+      const grupaNazwa=row.n;
+      // Zbierz zawartość nawiasu: skład głównego + podskładniki
+      const czesci=[];
+      if(glownySkladWewn && glownySkladWewn!=='0') czesci.push(glownySkladWewn);
+      if(subSklad) czesci.push(subSklad);
       let text;
-      if(subSklad){
-        // Wyciągnij nazwę głównego składnika i jego skład osobno
-        text = `${glownySklad}, ${subSklad}`;
+      if(czesci.length){
+        text = `${grupaNazwa} [${czesci.join(', ')}]`;
       } else {
-        text = glownySklad;
+        text = grupaNazwa;
       }
       items.push({waga:totalWaga, text, isGroupText:true});
     } else {
