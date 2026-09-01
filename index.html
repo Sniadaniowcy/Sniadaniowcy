@@ -316,6 +316,12 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
             <div style="font-weight:600;color:var(--ac);margin-bottom:10px;font-size:.9rem;letter-spacing:.3px">📝 Składniki dania</div>
             <div id="kr"></div>
             <button class="btn bgh sm" onclick="aKR()" style="margin-top:6px">+ Dodaj wiersz</button>
+            <div style="margin-top:14px;padding:12px 14px;background:rgba(237,179,19,.08);border:1.5px solid rgba(237,179,19,.3);border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <label style="font-weight:700;font-size:.85rem;color:var(--ac);margin:0">⚖️ WAGA DANIA (g):</label>
+              <input type="number" id="waga-dania" min="0" step="1" placeholder="np. 250" oninput="rc()"
+                style="width:110px;font-size:.95rem;font-weight:700;padding:7px 10px">
+              <span style="font-size:.72rem;color:var(--mu)">waga gotowego dania po obróbce — do wartości odżywczych na 100g</span>
+            </div>
           </div>
           <div class="rb"><div style="font-weight:700;font-size:.87rem;opacity:.8">SUMA DANIA</div>
           <div class="rg">
@@ -1359,10 +1365,16 @@ function gKD(){
   return{t,us};
 }
 function rc(){
-  const{t,us}=gKD();const wg=t.wg||1;
+  const{t,us}=gKD();
+  const sumaWag=t.wg||1; // suma surowych składników
+  // Waga na 100g: użyj wpisanej WAGA DANIA jeśli podana, inaczej suma składników
+  const wagaDania=parseFloat(document.getElementById('waga-dania')?.value)||0;
+  const wg=wagaDania>0?wagaDania:sumaWag; // dzielnik dla wartości na 100g
   const s=(id,v)=>document.getElementById(id).textContent=v;
+  // SUMA DANIA - bez zmian (suma z surowych składników, kalorie się nie zmieniają)
   s('rw',nf(t.wg,0)+' g');s('rk',nf(t.kc,1));s('rt',nf(t.tl)+' g');s('rn',nf(t.tn)+' g');
   s('rw2',nf(t.we)+' g');s('rc',nf(t.cu)+' g');s('rb2',nf(t.bi)+' g');s('rs',nf(t.so,3)+' g');
+  // NA 100g - liczone wg WAGA DANIA (lub sumy jeśli nie podano)
   s('pk',nf(t.kc/wg*100,1));s('pt2',nf(t.tl/wg*100)+' g');s('pn',nf(t.tn/wg*100)+' g');
   s('pw',nf(t.we/wg*100)+' g');s('pcu',nf(t.cu/wg*100)+' g');s('pbi',nf(t.bi/wg*100)+' g');
   s('pso',nf(t.so/wg*100,3)+' g');s('pko',zl(t.ko));
@@ -1984,6 +1996,13 @@ function sav(tg){
   if(!nz){alert('Podaj nazwę dania!');return;}
   const{t,us}=gKD();
   if(!us.length){alert('Dodaj składniki z wagami!');return;}
+  // WAGA DANIA wymagana przed zapisem do obu baz
+  const wagaDania=parseFloat(document.getElementById('waga-dania')?.value)||0;
+  if(wagaDania<=0){
+    alert('⚖️ Podaj WAGĘ DANIA (g) przed zapisaniem!\n\nTo waga gotowego dania po obróbce — potrzebna do wyliczenia wartości odżywczych na 100g.');
+    document.getElementById('waga-dania')?.focus();
+    return;
+  }
   const overwrite=document.getElementById('overwrite-chk')?.checked ?? true;
   const wg=t.wg||1;
 
@@ -2083,7 +2102,10 @@ async function doSave(tg, nz, overwrite){
   const{t,us}=gKD();
   if(!us.length) return;
   try{
-  const wg=t.wg||1;
+  const sumaWag=t.wg||1;
+  // Waga gotowego dania - do przeliczenia wartości na 100g
+  const wagaGotowa=parseFloat(document.getElementById('waga-dania')?.value)||0;
+  const wg=wagaGotowa>0?wagaGotowa:sumaWag; // dzielnik na 100g
   const op=getOpakTotal();
   const opDetails=getOpakDetails();
   const st=parseFloat(document.getElementById('fs')?.value)||35;
@@ -2135,7 +2157,7 @@ async function doSave(tg, nz, overwrite){
   });
   const td=new Date().toLocaleDateString('pl-PL');
   if(tg==='odz'||tg==='both'){
-    const e={nazwa:nz,data:td,waga_g:t.wg,kcal100:t.kc/wg*100,tl100:t.tl/wg*100,tlnas100:t.tn/wg*100,weg100:t.we/wg*100,cukry100:t.cu/wg*100,bialka100:t.bi/wg*100,sol100:t.so/wg*100,alergeny:[...aS].join(', ')||'Brak',moze_zawierac:[...mS].join(', ')||'Brak',sklad_etykieta:sk,skladniki:skl};
+    const e={nazwa:nz,data:td,waga_g:t.wg,waga_gotowa:wagaGotowa,kcal100:t.kc/wg*100,tl100:t.tl/wg*100,tlnas100:t.tn/wg*100,weg100:t.we/wg*100,cukry100:t.cu/wg*100,bialka100:t.bi/wg*100,sol100:t.so/wg*100,alergeny:[...aS].join(', ')||'Brak',moze_zawierac:[...mS].join(', ')||'Brak',sklad_etykieta:sk,skladniki:skl};
     const existIdx=BO.findIndex(d=>d.nazwa.toLowerCase()===nz.toLowerCase());
     if(overwrite && existIdx>=0){
       await dbU('baza_odz',BO[existIdx].id,e);
@@ -2148,7 +2170,7 @@ async function doSave(tg, nz, overwrite){
     }
   }
   if(tg==='fc'||tg==='both'){
-    const e={nazwa:nz,data:td,waga_g:t.wg,koszt_sk:t.ko,koszt_opak:op,koszt_rob:rb,koszt_wytw:wt,cena_sp:ce,marza:ma,sztuki:sz,sklad_etykieta:sk,skladniki:skl,fc_params:{opak:op,opakowania:opDetails,stawka:st,czas:cz,sztuki:sz,marza:ma,cena_target:ce},alert_cena:al};
+    const e={nazwa:nz,data:td,waga_g:t.wg,waga_gotowa:wagaGotowa,koszt_sk:t.ko,koszt_opak:op,koszt_rob:rb,koszt_wytw:wt,cena_sp:ce,marza:ma,sztuki:sz,sklad_etykieta:sk,skladniki:skl,fc_params:{opak:op,opakowania:opDetails,stawka:st,czas:cz,sztuki:sz,marza:ma,cena_target:ce},alert_cena:al};
     const existIdx=BF.findIndex(d=>d.nazwa.toLowerCase()===nz.toLowerCase());
     if(overwrite && existIdx>=0){
       await dbU('baza_fc',BF[existIdx].id,e);
@@ -2376,6 +2398,9 @@ function ltk(t){
   const baza=t==='odz'?BO:BF;const d=baza.find(x=>x.id===c.dataset.id);
   if(!d||!d.skladniki)return;
   document.getElementById('sn').value=d.nazwa;
+  // Przywróć wagę gotowego dania
+  const wagaDaniaEl=document.getElementById('waga-dania');
+  if(wagaDaniaEl) wagaDaniaEl.value=d.waga_gotowa||'';
   // Odtwórz strukturę składników (z grupami i podskładnikami jeśli zapisane)
   kR=[];
   d.skladniki.forEach((sk,i)=>{
