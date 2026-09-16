@@ -1354,6 +1354,49 @@ function buildHierarchSklad(){
   return items.map(i=>i.text).join(', ');
 }
 
+// ══════════════════════════════════════════════
+// SŁOWNIK ALERGENÓW UE (14 grup) + odduplikowanie
+// ══════════════════════════════════════════════
+const ALERGENY_UE = {
+  'gluten': ['gluten','pszenic','pszenn','pszenż','żyto','żytni','jęczmie','owies','owsian','orkisz','mąka','kasza','bułka','bułce','bułki','makaron','otręb','słód','manna','kuskus','semolina','graham','razow'],
+  'skorupiaki': ['skorupiak','krewetk','krab','homar','langust','rak '],
+  'jaja': ['jaj','jajk','jajec','albumin'],
+  'ryby': ['ryba','rybn','ryby','łosoś','tuńczyk','dorsz','śledź','makrel','sardel','anchois','panga','mintaj','morszczuk'],
+  'orzeszki ziemne': ['orzeszki ziemne','orzeszek ziemny','arachid','fistasz','orzech ziemny','orzechy ziemne'],
+  'soja': ['soja','sojow','soi','tofu','edamame'],
+  'mleko': ['mleko','mlek','mlecz','śmietan','masł','ser ','sera','serek','serze','jogurt','kefir','maślank','serwatk','laktoz','kazein','twaróg','twarog','twarożek'],
+  'orzechy': ['migdał','orzech laskow','orzech włosk','orzechy włosk','nerkowiec','nerkowc','pekan','pistacj','makadami','orzech brazylijsk','orzechy laskow'],
+  'seler': ['seler'],
+  'gorczyca': ['gorczyc','musztard'],
+  'sezam': ['sezam','tahini','tahina'],
+  'siarczyny': ['siarczyn','dwutlenek siarki','e220','e221','e222','e223','e224','e226','e227','e228'],
+  'łubin': ['łubin'],
+  'mięczaki': ['małż','ślimak','ostryg','kalmar','ośmiornic','mątw','przegrzeb','sepia']
+};
+
+// Rozpoznaj do której grupy alergenu należy dany tekst
+function rozpoznajAlergen(tekst){
+  const t=(tekst||'').toLowerCase();
+  for(const [grupa, slowa] of Object.entries(ALERGENY_UE)){
+    for(const slowo of slowa){
+      if(t.includes(slowo)) return grupa;
+    }
+  }
+  return null;
+}
+
+// Sprawdź jakie grupy alergenów są PEWNE (w pełnym składzie dania)
+function pewneAlergeny(pelnySkladText){
+  const t=(pelnySkladText||'').toLowerCase();
+  const grupy=new Set();
+  for(const [grupa, slowa] of Object.entries(ALERGENY_UE)){
+    for(const slowo of slowa){
+      if(t.includes(slowo)){ grupy.add(grupa); break; }
+    }
+  }
+  return grupy;
+}
+
 function gKD(){
   const pd={};PR.filter(p=>!p.deleted_at).forEach(p=>pd[p.nazwa]=p);
   let t={wg:0,kc:0,tl:0,tn:0,we:0,cu:0,bi:0,so:0,ko:0};const us=[];
@@ -1390,8 +1433,21 @@ function rc(){
     (p.alergeny||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>aS.add(a));
     (p.moze_zawierac||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>mS.add(a));
   });
+  // ODDUPLIKOWANIE: usuń z "może zawierać" alergeny które są PEWNE w składzie
+  // Zbierz cały pełny skład dania + pole alergeny (te pewne)
+  let calySklad='';
+  sr.forEach(({p})=>{
+    calySklad += ' ' + (p.pelny_sklad||'') + ' ' + (p.alergeny||'');
+  });
+  const grupyPewne = pewneAlergeny(calySklad); // np. {gluten, mleko}
+  // Odfiltruj "może zawierać" - usuń te których grupa jest już pewna
+  const mSfiltered = [...mS].filter(alergen=>{
+    const grupa = rozpoznajAlergen(alergen);
+    if(grupa && grupyPewne.has(grupa)) return false; // usuń - już pewny
+    return true; // zostaw
+  });
   document.getElementById('at').textContent=([...aS].join(', ')||'Brak').toUpperCase();
-  document.getElementById('mt').textContent=([...mS].join(', ')||'Brak').toUpperCase();
+  document.getElementById('mt').textContent=(mSfiltered.join(', ')||'Brak').toUpperCase();
   rFC();
 }
 function rFC(){
@@ -2127,6 +2183,15 @@ async function doSave(tg, nz, overwrite){
     (p.alergeny||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>aS.add(a));
     (p.moze_zawierac||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>mS.add(a));
   });
+  // ODDUPLIKOWANIE alergenów przed zapisem
+  let calySkladSave='';
+  us.forEach(({p})=>{ calySkladSave += ' ' + (p.pelny_sklad||'') + ' ' + (p.alergeny||''); });
+  const grupyPewneSave = pewneAlergeny(calySkladSave);
+  const mSarr = [...mS].filter(alergen=>{
+    const grupa = rozpoznajAlergen(alergen);
+    if(grupa && grupyPewneSave.has(grupa)) return false;
+    return true;
+  });
   const sr=[...us].sort((a,b)=>b.w-a.w);
   const sk=buildHierarchSklad();
   // Zapisz składniki z zachowaniem struktury zagnieżdżenia
@@ -2162,7 +2227,7 @@ async function doSave(tg, nz, overwrite){
   });
   const td=new Date().toLocaleDateString('pl-PL');
   if(tg==='odz'||tg==='both'){
-    const e={nazwa:nz,data:td,waga_g:t.wg,waga_gotowa:wagaGotowa,kcal100:t.kc/wg*100,tl100:t.tl/wg*100,tlnas100:t.tn/wg*100,weg100:t.we/wg*100,cukry100:t.cu/wg*100,bialka100:t.bi/wg*100,sol100:t.so/wg*100,alergeny:[...aS].join(', ')||'Brak',moze_zawierac:[...mS].join(', ')||'Brak',sklad_etykieta:sk,skladniki:skl};
+    const e={nazwa:nz,data:td,waga_g:t.wg,waga_gotowa:wagaGotowa,kcal100:t.kc/wg*100,tl100:t.tl/wg*100,tlnas100:t.tn/wg*100,weg100:t.we/wg*100,cukry100:t.cu/wg*100,bialka100:t.bi/wg*100,sol100:t.so/wg*100,alergeny:[...aS].join(', ')||'Brak',moze_zawierac:mSarr.join(', ')||'Brak',sklad_etykieta:sk,skladniki:skl};
     const existIdx=BO.findIndex(d=>d.nazwa.toLowerCase()===nz.toLowerCase());
     if(overwrite && existIdx>=0){
       await dbU('baza_odz',BO[existIdx].id,e);
