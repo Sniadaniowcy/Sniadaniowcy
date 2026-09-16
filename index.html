@@ -351,8 +351,12 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
             <div style="font-weight:600;color:var(--ac);margin-bottom:8px;font-size:.9rem">🏷 Skład na etykietę</div>
             <div class="skb"><span id="st">—</span></div>
             <button class="btn bgh sm" style="margin-top:7px" onclick="cpEl('st')">📋 Kopiuj skład</button>
-            <div class="alb"><strong>Alergeny:</strong> <span id="at">—</span></div>
-            <div class="mob"><strong>Może zawierać:</strong> <span id="mt">—</span></div>
+            <div class="alb"><strong>Alergeny:</strong> <span id="at">—</span>
+              <button class="btn bgh sm" style="margin-left:8px;padding:2px 8px;font-size:.7rem" onclick="cpEl('at')">📋 Kopiuj</button>
+            </div>
+            <div class="mob"><strong>Może zawierać:</strong> <span id="mt">—</span>
+              <button class="btn bgh sm" style="margin-left:8px;padding:2px 8px;font-size:.7rem" onclick="cpEl('mt')">📋 Kopiuj</button>
+            </div>
           </div>
           <div class="sp"><h3>Zapisz do bazy dań</h3>
           <div><label style="color:rgba(255,255,255,.7)">Nazwa dania</label>
@@ -1293,9 +1297,10 @@ function buildHierarchSklad(){
   // Funkcja: skład pojedynczego produktu jako "NAZWA [SKŁAD]" lub "NAZWA"
   const prodSklad=(nazwa)=>{
     const p=pd[nazwa];
-    if(!p) return nazwa;
+    if(!p) return (nazwa||'').toUpperCase();
     const s=(p.pelny_sklad||'').toUpperCase();
-    return s&&s!=='0' ? `${p.nazwa} [${s}]` : p.nazwa;
+    const nazwaUpper=(p.nazwa||'').toUpperCase();
+    return s&&s!=='0' ? `${nazwaUpper} [${s}]` : nazwaUpper;
   };
 
   // Zbierz elementy w kolejności: grupy z podskładnikami, luźne składniki
@@ -1325,7 +1330,7 @@ function buildHierarchSklad(){
       const totalWaga=row.w+subs.reduce((s,x)=>s+x.w,0);
       // FORMAT: wszystko w JEDNYM nawiasie
       // "Filet z kurczaka [SKŁAD FILETA, PANIERKA [BUŁKA TARTA...], SOS [...]]"
-      const grupaNazwa=row.n;
+      const grupaNazwa=(row.n||'').toUpperCase();
       // Zbierz zawartość nawiasu: skład głównego + podskładniki
       const czesci=[];
       if(glownySkladWewn && glownySkladWewn!=='0') czesci.push(glownySkladWewn);
@@ -1385,8 +1390,8 @@ function rc(){
     (p.alergeny||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>aS.add(a));
     (p.moze_zawierac||'').split(',').map(a=>a.trim()).filter(a=>a&&a.toLowerCase()!=='brak').forEach(a=>mS.add(a));
   });
-  document.getElementById('at').textContent=[...aS].join(', ')||'Brak';
-  document.getElementById('mt').textContent=[...mS].join(', ')||'Brak';
+  document.getElementById('at').textContent=([...aS].join(', ')||'Brak').toUpperCase();
+  document.getElementById('mt').textContent=([...mS].join(', ')||'Brak').toUpperCase();
   rFC();
 }
 function rFC(){
