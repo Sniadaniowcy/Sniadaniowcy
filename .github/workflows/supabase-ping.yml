@@ -1,14 +1,27 @@
-name: Supabase Keep Alive
+name: Supabase Keep-Alive
+
+# Uruchamia się automatycznie co 5 dni oraz można uruchomić ręcznie
 on:
   schedule:
-    - cron: '0 9 */5 * *'
-  workflow_dispatch:
+    # Codziennie o 9:00 i 21:00 UTC (dwa razy dziennie dla pewności)
+    - cron: '0 9,21 * * *'
+  workflow_dispatch:  # pozwala uruchomić ręcznie przyciskiem
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Ping Supabase (zapytanie do bazy)
         run: |
-          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/produkty?select=id&limit=1" \
+          echo "Wysyłam zapytanie do Supabase żeby utrzymać projekt aktywny..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/produkty?select=id&limit=1" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}"
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}")
+          echo "Odpowiedź serwera: HTTP $RESPONSE"
+          if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "401" ] || [ "$RESPONSE" = "403" ]; then
+            echo "✓ Supabase odpowiedział - projekt jest aktywny"
+          else
+            echo "⚠ Nieoczekiwana odpowiedź: $RESPONSE"
+            exit 1
+          fi
