@@ -58,6 +58,11 @@ label{font-size:.78rem;font-weight:600;color:var(--mu);display:block;margin-bott
 .tw::-webkit-scrollbar-thumb:hover{background:var(--ac)}
 table{width:100%;border-collapse:collapse;background:var(--s);font-size:.83rem;table-layout:fixed}
 thead th{background:var(--s3);color:var(--tx);padding:10px 10px;text-align:left;font-weight:600;font-size:.78rem;white-space:nowrap;position:sticky;top:0;z-index:10;border-bottom:2px solid var(--ac);overflow:hidden;text-overflow:ellipsis}
+.col-grip{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;z-index:25;user-select:none}
+.col-grip::after{content:"";position:absolute;right:1px;top:18%;height:64%;width:2px;background:transparent;border-radius:2px;transition:background .12s}
+.col-grip:hover::after{background:var(--ac)}
+.col-grip.dragging::after{background:var(--ac)}
+body.col-resizing,body.col-resizing *{cursor:col-resize!important;user-select:none!important}
 tbody tr{border-bottom:1px solid var(--bo);transition:background .1s}
 tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
 tbody tr:hover{background:var(--s2)}
@@ -215,11 +220,11 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
 @media(max-width:900px){.c2{grid-template-columns:1fr}.rg{grid-template-columns:repeat(2,1fr)}}
 
 /* BAZA TABLES - equal column widths */
-#bob td, #bob th, #bfb td, #bfb th{min-width:110px;max-width:200px}
+#bob td, #bob th, #bfb td, #bfb th{min-width:40px}
 #bob td:first-child, #bfb td:first-child,
 #bob th:first-child, #bfb th:first-child{min-width:30px;max-width:40px;width:40px}
 #bob td:nth-child(2), #bfb td:nth-child(2),
-#bob th:nth-child(2), #bfb th:nth-child(2){min-width:160px;max-width:220px}
+#bob th:nth-child(2), #bfb th:nth-child(2){min-width:120px}
 </style>
 </head>
 <body>
@@ -302,10 +307,10 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <input type="text" id="sp" placeholder="🔍 Szukaj…" style="width:180px" oninput="debSearch(renP,'prod')">
       </div></div>
       <div class="tw"><table><thead><tr>
-        <th style="width:30px"><input type="checkbox" id="ca" onchange="togA(this)"></th>
-        <th style="width:100px">Kategoria</th><th>Firma</th><th>Nazwa *</th><th>Pełny skład</th><th>Alergeny</th><th>Może zawierać</th>
-        <th>kcal</th><th>Tłuszcze</th><th>Tł.nas.</th><th>Węglow.</th><th>Cukry</th><th>Białka</th><th>Sól</th>
-        <th>Ilość</th><th>Jedn.</th><th>Waga opak.</th><th>Cena zakupu</th><th>Cena/1g</th>
+        <th style="width:34px"><input type="checkbox" id="ca" onchange="togA(this)"></th>
+        <th style="width:100px">Kategoria</th><th style="width:95px">Firma</th><th style="width:170px">Nazwa *</th><th style="width:190px">Pełny skład</th><th style="width:115px">Alergeny</th><th style="width:115px">Może zawierać</th>
+        <th style="width:58px">kcal</th><th style="width:72px">Tłuszcze</th><th style="width:62px">Tł.nas.</th><th style="width:72px">Węglow.</th><th style="width:58px">Cukry</th><th style="width:62px">Białka</th><th style="width:56px">Sól</th>
+        <th style="width:62px">Ilość</th><th style="width:66px">Jedn.</th><th style="width:82px">Waga opak.</th><th style="width:92px">Cena zakupu</th><th style="width:82px">Cena/1g</th>
       </tr></thead><tbody id="pb"></tbody></table></div>
     </div>
     <div class="tab" id="tab-kalkulator">
@@ -318,7 +323,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
             <button class="btn bgh sm" onclick="aKR()" style="margin-top:6px">+ Dodaj wiersz</button>
             <div style="margin-top:14px;padding:12px 14px;background:rgba(237,179,19,.08);border:1.5px solid rgba(237,179,19,.3);border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <label style="font-weight:700;font-size:.85rem;color:var(--ac);margin:0">⚖️ WAGA DANIA (g):</label>
-              <input type="number" id="waga-dania" min="0" step="1" placeholder="np. 250" oninput="rc()"
+              <input type="number" id="waga-dania" min="0" step="1" placeholder="np. 250" oninput="rc();autoSaveKalk()"
                 style="width:110px;font-size:.95rem;font-weight:700;padding:7px 10px">
               <span style="font-size:.72rem;color:var(--mu)">waga gotowego dania po obróbce — do wartości odżywczych na 100g</span>
             </div>
@@ -362,7 +367,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
           <div><label style="color:rgba(255,255,255,.7)">Nazwa dania</label>
           <div style="position:relative">
           <input type="text" id="sn" placeholder="np. Chrupiąca Kiwi-zja…"
-            oninput="checkExisting();showDanieAC()"
+            oninput="checkExisting();showDanieAC();autoSaveKalk()"
             onblur="setTimeout(()=>hideDanieAC(),200)"
             autocomplete="off">
           <div id="danie-ac" style="display:none;position:absolute;top:100%;left:0;right:0;
@@ -946,7 +951,19 @@ async function initApp(){
     document.getElementById('dot').className='dot ok';
     document.getElementById('clb').textContent='połączono ✓';
     document.getElementById('lo').style.display='none';
-    renP();iK();renOpak();renderFolders('prod');renderFolders('odz');renderFolders('fc');updateTrashCount();autoCleanTrash();
+    renP();iK();renOpak();renderFolders('prod');renderFolders('odz');renderFolders('fc');
+    setTimeout(initColResize,50);
+    // Sprawdź czy są niezapisane dane w kalkulatorze (po odświeżeniu/zacięciu)
+    const savedKalk=restoreKalkState();
+    if(savedKalk){
+      setTimeout(()=>{
+        if(confirm('🔄 Wykryto niezapisane dane w kalkulatorze z poprzedniej sesji.\n\nCzy przywrócić? (nazwa dania, składniki, wagi)\n\nOK = przywróć | Anuluj = zacznij od nowa')){
+          doRestoreKalk(savedKalk);
+        } else {
+          clearKalkAutosave();
+        }
+      }, 600);
+    }updateTrashCount();autoCleanTrash();
     // Jednorazowe przypomnienie o SQL dla kolumny kategoria
     if(!localStorage.getItem('sql_kategoria_done')){
       console.info('💡 Aby używać folderów, wklej w Supabase SQL Editor:\nALTER TABLE baza_odz ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';\nALTER TABLE baza_fc ADD COLUMN IF NOT EXISTS kategoria TEXT DEFAULT \'\';');
@@ -967,6 +984,94 @@ function ST(n,b){
   if(n==='baza-odz')renBO();
   if(n==='baza-fc')renBF();
   if(n==='foodcost')rFC();
+  // Włącz zmianę szerokości kolumn dla tabeli w tej zakładce (gdy stała się widoczna)
+  setTimeout(initColResize,30);
+}
+
+// ══════════════════════════════════════════════
+// ZMIANA SZEROKOŚCI KOLUMN (przeciąganie jak w Excelu)
+// ══════════════════════════════════════════════
+function initColResize(){
+  document.querySelectorAll('.tw table').forEach(table=>{
+    if(table.dataset.resizable==='1') return;           // już zainicjowana
+    const tbody=table.querySelector('tbody');
+    const key='sn_colw_'+(tbody?tbody.id:'');
+    let saved={};
+    try{ saved=JSON.parse(localStorage.getItem(key)||'{}'); }catch(e){}
+    const hasSaved=Object.keys(saved).length>0;
+    // Jeśli tabela jest ukryta i nie ma zapisanych szerokości — poczekaj aż będzie widoczna
+    if(!hasSaved && table.offsetParent===null) return;
+    const ths=[...table.querySelectorAll('thead th')];
+    if(!ths.length) return;
+    ths.forEach((th,i)=>{
+      // Zapamiętaj domyślną szerokość (do resetu podwójnym kliknięciem)
+      if(!th.dataset.defW){
+        th.dataset.defW=Math.round(parseFloat(th.style.width)||th.offsetWidth||90);
+      }
+      // Ustal szerokość: zapisana > domyślna
+      let w=saved[i]||th.dataset.defW;
+      th.style.width=w+'px';
+      // Uchwyt (nie dla pierwszej kolumny z checkboxem)
+      if(i>0 && !th.querySelector('.col-grip')){
+        const grip=document.createElement('div');
+        grip.className='col-grip';
+        grip.title='Przeciągnij aby zmienić szerokość (podwójne kliknięcie = reset)';
+        grip.addEventListener('mousedown',e=>startColResize(e,table,th,i,key));
+        grip.addEventListener('dblclick',e=>resetCol(e,table,th,i,key));
+        th.appendChild(grip);
+      }
+    });
+    updateTableWidth(table);
+    table.dataset.resizable='1';
+  });
+}
+
+function updateTableWidth(table){
+  const ths=[...table.querySelectorAll('thead th')];
+  const total=ths.reduce((s,th)=>s+(parseFloat(th.style.width)||th.offsetWidth||0),0);
+  if(total>0){ table.style.width=total+'px'; table.style.minWidth=total+'px'; }
+}
+
+let _colResize=null;
+function startColResize(e,table,th,idx,key){
+  e.preventDefault(); e.stopPropagation();
+  _colResize={table,th,idx,key,startX:e.clientX,startW:th.offsetWidth};
+  e.target.classList.add('dragging');
+  document.body.classList.add('col-resizing');
+  document.addEventListener('mousemove',onColResize);
+  document.addEventListener('mouseup',endColResize);
+}
+function onColResize(e){
+  if(!_colResize) return;
+  const w=Math.max(40,_colResize.startW+(e.clientX-_colResize.startX));
+  _colResize.th.style.width=w+'px';
+  updateTableWidth(_colResize.table);
+}
+function endColResize(){
+  if(!_colResize) return;
+  try{
+    const saved=JSON.parse(localStorage.getItem(_colResize.key)||'{}');
+    saved[_colResize.idx]=Math.round(_colResize.th.offsetWidth);
+    localStorage.setItem(_colResize.key,JSON.stringify(saved));
+  }catch(e){}
+  document.querySelectorAll('.col-grip.dragging').forEach(g=>g.classList.remove('dragging'));
+  document.body.classList.remove('col-resizing');
+  document.removeEventListener('mousemove',onColResize);
+  document.removeEventListener('mouseup',endColResize);
+  _colResize=null;
+}
+// Podwójne kliknięcie na uchwycie — reset tej kolumny do wartości domyślnej
+function resetCol(e,table,th,idx,key){
+  e.preventDefault(); e.stopPropagation();
+  try{
+    const saved=JSON.parse(localStorage.getItem(key)||'{}');
+    delete saved[idx];
+    localStorage.setItem(key,JSON.stringify(saved));
+  }catch(e){}
+  // Przywróć domyślną szerokość zapisaną w data-default (ustawianą przy pierwszym init)
+  const def=th.dataset.defW;
+  if(def){ th.style.width=def+'px'; }
+  updateTableWidth(table);
 }
 
 const nf=(v,d=2)=>{
@@ -1081,8 +1186,8 @@ function renP(){
       :`<span style="color:var(--mu);font-size:.7rem">—</span>`;
     c+=`<td>${katBadge}</td>`;
     PFD.forEach(f=>{
-      if(f.t==='sl'){const o=f.o.map(x=>`<option${x===p[f.k]?' selected':''}>${x}</option>`).join('');c+=`<td><select class="ci sel" style="width:${f.w}px" onchange="upP('${p.id}','${f.k}',this.value)">${o}</select></td>`;}
-      else{const isUp=f.k==='pelny_sklad';const upAttr=isUp?"this.value.toUpperCase()":"this.value";c+=`<td><input class="ci${isUp?' ci-upper':''}" type="${f.t==='nm'?'number':'text'}" value="${p[f.k]??''}" style="width:${f.w}px;${isUp?'text-transform:uppercase':''}" step="${f.t==='nm'?'0.001':''}" onchange="upP('${p.id}','${f.k}',${upAttr})"></td>`;}
+      if(f.t==='sl'){const o=f.o.map(x=>`<option${x===p[f.k]?' selected':''}>${x}</option>`).join('');c+=`<td><select class="ci sel" style="width:100%" onchange="upP('${p.id}','${f.k}',this.value)">${o}</select></td>`;}
+      else{const isUp=f.k==='pelny_sklad';const upAttr=isUp?"this.value.toUpperCase()":"this.value";c+=`<td><input class="ci${isUp?' ci-upper':''}" type="${f.t==='nm'?'number':'text'}" value="${p[f.k]??''}" style="width:100%;${isUp?'text-transform:uppercase':''}" step="${f.t==='nm'?'0.001':''}" onchange="upP('${p.id}','${f.k}',${upAttr})"></td>`;}
     });
     c+=`<td style="color:var(--green);font-weight:600;font-size:.8rem;white-space:nowrap" id="g${p.id}">${g?g.toFixed(4)+' zł':'—'}</td>`;
     const tr=document.createElement('tr');
@@ -1179,6 +1284,75 @@ Możesz je przywrócić w ciągu 30 dni.`))return;
 }
 
 let kR=[];
+// ══════════════════════════════════════════════
+// AUTO-ZAPIS KALKULATORA (ochrona przed utratą przy odświeżeniu)
+// ══════════════════════════════════════════════
+let _autoSaveTimer=null;
+
+function saveKalkState(){
+  try{
+    const state={
+      kR: kR,
+      nazwa: document.getElementById('sn')?.value||'',
+      wagaDania: document.getElementById('waga-dania')?.value||'',
+      // Pola food cost
+      fs: document.getElementById('fs')?.value||'',
+      fc2: document.getElementById('fc2')?.value||'',
+      fst: document.getElementById('fst')?.value||'',
+      fa: document.getElementById('fa')?.value||'',
+      cenaTarget: document.getElementById('fc-cena-target')?.value||'',
+      ts: Date.now()
+    };
+    localStorage.setItem('sn_kalk_autosave', JSON.stringify(state));
+  }catch(e){ /* localStorage pełny lub niedostępny - ignoruj */ }
+}
+
+function autoSaveKalk(){
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer=setTimeout(saveKalkState, 800); // zapisz 0.8s po ostatniej zmianie
+}
+
+function restoreKalkState(){
+  try{
+    const saved=localStorage.getItem('sn_kalk_autosave');
+    if(!saved) return false;
+    const state=JSON.parse(saved);
+    // Sprawdź czy są jakieś realne dane (nie pusty kalkulator)
+    const maDane = state.kR && state.kR.some(r=>r.n && r.n.trim());
+    if(!maDane) return false;
+    // Sprawdź wiek - starsze niż 7 dni pomijamy
+    if(state.ts && (Date.now()-state.ts) > 7*24*60*60*1000) return false;
+    return state;
+  }catch(e){ return false; }
+}
+
+function doRestoreKalk(state){
+  try{
+    kR = state.kR || [];
+    // Dopełnij do min 10 wierszy
+    while(kR.length<10){
+      const id='r'+Date.now()+Math.random().toString(36).slice(2)+kR.length;
+      kR.push({id,n:'',w:0,parent:null,isGroup:false});
+    }
+    renderKalkRows();
+    if(document.getElementById('sn')) document.getElementById('sn').value=state.nazwa||'';
+    if(document.getElementById('waga-dania')) document.getElementById('waga-dania').value=state.wagaDania||'';
+    if(document.getElementById('fs')&&state.fs) document.getElementById('fs').value=state.fs;
+    if(document.getElementById('fc2')&&state.fc2) document.getElementById('fc2').value=state.fc2;
+    if(document.getElementById('fst')&&state.fst) document.getElementById('fst').value=state.fst;
+    if(document.getElementById('fa')&&state.fa) document.getElementById('fa').value=state.fa;
+    if(document.getElementById('fc-cena-target')&&state.cenaTarget) document.getElementById('fc-cena-target').value=state.cenaTarget;
+    rc();
+    nt('✅ Przywrócono niezapisane dane z kalkulatora');
+  }catch(e){
+    console.error('Błąd przywracania:',e);
+  }
+}
+
+function clearKalkAutosave(){
+  try{ localStorage.removeItem('sn_kalk_autosave'); }catch(e){}
+}
+
 function iK(){
   kR=[];
   document.getElementById('kr').innerHTML='';
@@ -1193,6 +1367,7 @@ function aKR(parentId){
   const row={id,n:'',w:0,parent:parentId||null,isGroup:false};
   kR.push(row);
   renderKalkRows();
+  autoSaveKalk();
   return id;
 }
 
@@ -1279,9 +1454,11 @@ function rKR(id){
   }
   renderKalkRows();
   rc();
+  autoSaveKalk();
 }
 function kI(el,id){
   const q=el.value.toLowerCase(),row=kR.find(r=>r.id===id);if(row)row.n=el.value;
+  autoSaveKalk();
   document.querySelectorAll('.ad').forEach(d=>d.remove());
   if(!q){rc();return;}
   const m=PR.filter(p=>!p.deleted_at&&p.nazwa.toLowerCase().includes(q)).slice(0,8);if(!m.length)return;
@@ -1289,7 +1466,7 @@ function kI(el,id){
   m.forEach(p=>{const d=document.createElement('div');d.textContent=p.nazwa;d.onmousedown=()=>{el.value=p.nazwa;if(row)row.n=p.nazwa;dd.remove();rc();};dd.appendChild(d);});
   w.appendChild(dd);el.onblur=()=>setTimeout(()=>dd.remove(),150);
 }
-function kW(el,id){const row=kR.find(r=>r.id===id);if(row)row.w=parseFloat(el.value)||0;rc();}
+function kW(el,id){const row=kR.find(r=>r.id===id);if(row)row.w=parseFloat(el.value)||0;rc();autoSaveKalk();}
 // Buduj skład etykiety z hierarchią (grupy i podskładniki)
 function buildHierarchSklad(){
   const pd={};PR.filter(p=>!p.deleted_at).forEach(p=>pd[p.nazwa]=p);
@@ -2252,6 +2429,7 @@ async function doSave(tg, nz, overwrite){
     }
   }
   nt(`✅ "${nz}" zapisane!`);
+  clearKalkAutosave(); // dane zapisane w bazie - usuń kopię roboczą
   }catch(e){
     console.error('Błąd zapisu dania:',e);
     nt(`❌ NIE ZAPISANO! ${e.message||'Sprawdź połączenie'}`);
