@@ -405,14 +405,14 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
           <input type="file" id="imp-opak" accept=".csv" style="display:none" onchange="importBase('opakowania',this)">
         </div>
       </div>
-      <div class="tbl-wrap">
-        <table>
+      <div class="tbl-wrap" style="overflow:auto;border-radius:var(--r);box-shadow:var(--sh)">
+        <table style="table-layout:auto;width:100%">
           <thead><tr>
-            <th style="width:30px"><input type="checkbox" id="opak-chk-all" onchange="document.querySelectorAll('.opak-chk').forEach(c=>c.checked=this.checked)"></th>
-            <th style="min-width:220px">Nazwa</th>
-            <th style="width:90px">Cena (zł)</th>
-            <th style="width:80px">Jednostka</th>
-            <th style="width:90px">Cena/szt</th>
+            <th style="width:34px"><input type="checkbox" id="opak-chk-all" onchange="document.querySelectorAll('.opak-chk').forEach(c=>c.checked=this.checked)"></th>
+            <th>Nazwa</th>
+            <th style="width:110px">Cena (zł)</th>
+            <th style="width:100px">Jednostka</th>
+            <th style="width:100px">Cena/szt</th>
           </tr></thead>
           <tbody id="opak-tbody"></tbody>
         </table>
@@ -1769,14 +1769,14 @@ function renOpak(){
     const bg=i%2?'background:var(--s2)':'background:var(--s)';
     _h+=`<tr style="${bg}">
       <td><input type="checkbox" class="opak-chk" data-id="${o.id}"></td>
-      <td><input class="ci" type="text" value="${o.nazwa||''}" style="width:210px"
+      <td><input class="ci" type="text" value="${(o.nazwa||'').replace(/"/g,'&quot;')}" style="width:100%"
         onchange="upOpak('${o.id}','nazwa',this.value)"></td>
-      <td><input class="ci" type="number" value="${o.cena||0}" style="width:80px;text-align:right" step="0.01"
+      <td><input class="ci" type="number" value="${o.cena||0}" style="width:100%;text-align:right" step="0.01"
         onchange="upOpak('${o.id}','cena',this.value)"></td>
-      <td><select class="ci sel" style="width:68px" onchange="upOpak('${o.id}','jednostka',this.value)">
+      <td><select class="ci sel" style="width:100%" onchange="upOpak('${o.id}','jednostka',this.value)">
         ${['szt','m','cm','kg','g','l','ml'].map(u=>`<option${u===o.jednostka?' selected':''}>${u}</option>`).join('')}
       </select></td>
-      <td style="color:var(--ac);font-weight:600;font-size:.82rem;text-align:right">${(parseFloat(o.cena)||0).toFixed(2)} zł</td>
+      <td id="opak-cs-${o.id}" style="color:var(--ac);font-weight:600;font-size:.82rem;text-align:right">${(parseFloat(o.cena)||0).toFixed(2)} zł</td>
     </tr>`;
   });
   tb.innerHTML=_h;
@@ -1786,17 +1786,31 @@ let uTO={};
 async function upOpak(id,field,value){
   const o=OP.find(x=>x.id===id); if(!o)return;
   o[field]=field==='cena'?(parseFloat(value)||0):value;
+  // Aktualizuj tylko kolumnę Cena/szt — NIE przebudowuj całej tabeli (gubiłoby to focus)
+  if(field==='cena'){
+    const cs=document.getElementById('opak-cs-'+id);
+    if(cs) cs.textContent=(parseFloat(o.cena)||0).toFixed(2)+' zł';
+  }
   clearTimeout(uTO[id]);
   uTO[id]=setTimeout(async()=>{
     try{ await dbU('opakowania',id,{[field]:o[field]}); nt('💾 Zapisano'); }
-    catch(e){ nt('❌ Błąd zapisu'); }
+    catch(e){ console.error('upOpak',e); nt('❌ Błąd zapisu'); }
   },800);
-  renOpak();
 }
 
 async function addOpak(){
   const r=await ins('opakowania',{nazwa:'Nowe opakowanie',opis:'',cena:0,jednostka:'szt'});
-  if(r&&r[0]){OP.push(r[0]);renOpak();nt('✅ Dodano opakowanie');}
+  if(r&&r[0]){
+    OP.unshift(r[0]);          // na górę listy
+    renOpak();
+    // Zaznacz pole nazwy nowego wiersza, żeby od razu wpisać
+    setTimeout(()=>{
+      const tb=document.getElementById('opak-tbody');
+      const firstNameInput=tb&&tb.querySelector('tr td:nth-child(2) input');
+      if(firstNameInput){ firstNameInput.focus(); firstNameInput.select(); }
+    },50);
+    nt('✅ Dodano opakowanie');
+  }
   else nt('❌ Błąd — sprawdź czy tabela opakowania istnieje w Supabase');
 }
 
