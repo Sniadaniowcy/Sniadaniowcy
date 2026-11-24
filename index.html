@@ -1278,7 +1278,7 @@ function renP(){
   const tb=document.getElementById('pb');tb.innerHTML='';
   list.forEach(p=>{
     const g=c1g(p);
-    let c=`<td><input type="checkbox" class="ck" data-id="${p.id}">${fmKropkaHtml(p.id)}</td>`;
+    let c=`<td><input type="checkbox" class="ck" data-id="${p.id}"></td>`;
     // Kolumna kategoria (badge + edytowalna przez prawy klik)
     const katBadge=p.kategoria
       ?`<span style="background:rgba(237,179,19,.15);border:1px solid rgba(237,179,19,.3);color:var(--ac);border-radius:10px;padding:1px 7px;font-size:.7rem">${p.kategoria}</span>`
@@ -1295,6 +1295,12 @@ function renP(){
     tr.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',p.id));
     tr.oncontextmenu=e=>{showMoveMenu(e,'prod',p.id,p.nazwa);return false;};
     tr.innerHTML=c;
+    // druga kropka: przy samej nazwie produktu (kolumna Nazwa), zeby byla widoczna tuz przy tekscie
+    if(fmPowiazania().has(p.id)){
+      const tdN=tr.children[3];
+      if(tdN){tdN.style.position='relative';const inp=tdN.querySelector('input');if(inp)inp.style.paddingLeft='16px';
+        tdN.insertAdjacentHTML('afterbegin',fmKropkaHtml(p.id).replace('class="fm-dot"','class="fm-dot" style="position:absolute;left:5px;top:50%;margin:-3px 0 0 0;z-index:1"'));}
+    }
     tb.appendChild(tr);
   });
   renderFolders('prod');
