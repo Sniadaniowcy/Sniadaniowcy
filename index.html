@@ -610,6 +610,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
             <div style="font-weight:600;color:var(--tx);font-size:.92rem">Pozycje czekające na decyzję</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <input type="text" placeholder="🔍 Szukaj pozycji lub dostawcy…" oninput="fmSzukaj(this.value)" style="font-size:.82rem;padding:6px 10px;width:230px">
+              <select id="fm-usun-dost" onchange="fmUsunDostawce(this.value);this.value=''" title="Usuń z kolejki wszystkie pozycje jednego dostawcy (np. faktury za rzeczy niezwiązane z jedzeniem)" style="font-size:.8rem;padding:6px 8px;max-width:210px"><option value="">🗑 Usuń wszystko od dostawcy…</option></select>
               <button class="btn bg" id="fm-apply-btn" onclick="fmZatwierdz()">✅ Zatwierdź zaznaczone (0)</button>
             </div>
           </div>
@@ -3582,6 +3583,8 @@ function fmRender(){
   if(n){
     const {lista,stron,widoczne}=fmWidok();
     const opcjeProd=PR.filter(p=>!p.deleted_at).slice().sort((a,b)=>a.nazwa.localeCompare(b.nazwa,'pl')).map(p=>{const c=c1g(p);return `<option value="${fmEsc(p.id)}">${fmEsc(p.nazwa)} — ${c>0?fmKg(c)+' / '+fmG(c):'brak ceny'}</option>`;}).join('');
+    {const sel=document.getElementById('fm-usun-dost');if(sel){const d={};FM.kolejka.forEach(e=>{const n=String(e.ost.dostawca||'(bez nazwy)');d[n]=(d[n]||0)+1;});
+      sel.innerHTML='<option value="">🗑 Usuń wszystko od dostawcy…</option>'+Object.keys(d).sort((a,b)=>a.localeCompare(b,'pl')).map(n=>`<option value="${fmEsc(n)}">${fmEsc(n)} (${d[n]})</option>`).join('');}}
     document.getElementById('fm-tbody').innerHTML=widoczne.map(e=>{
       const i=FM.kolejka.indexOf(e),o=fmOcena(e),p=e.ost,ww=fmWartosc(p),szt=fmJedn(p.jednostka)==='szt';
       const sel=`<select style="font-size:.8rem;width:100%;padding:5px 7px" onchange="fmUstaw(${i},'prodId',this.value)">
@@ -3605,7 +3608,7 @@ function fmRender(){
           +(o.netto?'<div style="font-size:.7rem;color:var(--gold)">cena netto (brak VAT w danych)</div>':'');
       }
       return `<tr${e.zmiana?' style="background:rgba(248,113,113,.07)"':''}>
-        <td style="text-align:center"><input type="checkbox" ${e.zazn?'checked':''} ${(e.prodId&&o.ok)?'':'disabled'} onchange="fmUstaw(${i},'zazn',this.checked)" style="width:16px;height:16px;accent-color:var(--ac)"></td>
+        <td style="text-align:center"><input type="checkbox" ${e.zazn?'checked':''} ${(e.prodId&&o.ok)?'':'disabled'} onchange="fmUstaw(${i},'zazn',this.checked)" style="width:16px;height:16px;accent-color:var(--ac)"><div><button class="btn bgh sm" title="Usuń tę pozycję z kolejki (nie dotyczy jedzenia)" onclick="fmUsun(${i})" style="padding:1px 6px;margin-top:6px;font-size:.78rem">🗑</button></div></td>
         <td><div style="font-size:.84rem;color:var(--tx);line-height:1.3">${fmEsc(e.nazwa)}</div>
           <div style="font-size:.72rem;color:var(--mu);margin-top:3px">${fmEsc(p.dostawca||'—')} · ${fmEsc(p.data_faktury||'—')} · nr ${fmEsc(p.numer||'—')}${e.ile>1?` · w ${e.ile} fakturach`:''}</div>
           ${e.zmiana?'<div style="font-size:.74rem;color:var(--red);font-weight:600;margin-top:3px">Cena zmieniła się o ponad 40% — potwierdź, że to nie pomyłka w jednostkach</div>':''}</td>
@@ -3699,6 +3702,28 @@ function fmSzukaj(v){FM.szukaj=v;FM.strona=0;fmRender();}
 
 // Zatwierdzenie zaznaczonych pozycji z bieżącej strony: zapamiętuje przypisanie (na zawsze)
 // i od razu aktualizuje cenę produktu.
+// Usuwanie z kolejki = oznaczenie jako "ignoruj" (pozycje o tej nazwie nie wroca; cofniesz w "Zapamietane przypisania")
+async function fmUsunPozycje(lista){
+  const teraz=new Date().toISOString();
+  await fmZapiszMapowania(lista.map(e=>fmMapa(e.nazwa,null,0,true,true)));
+  await fmPatchIds([].concat(...lista.map(e=>e.ids)),{status:'pominieta',zastosowano_at:teraz});
+}
+async function fmUsun(i){
+  const e=FM.kolejka[i];if(!e)return;
+  if(!confirm('Usunąć z kolejki pozycję:\n\n'+e.nazwa+'\n\nBędzie pomijana także na przyszłych fakturach. Gdyby to była pomyłka, cofniesz to w „Zapamiętane przypisania" (przycisk Cofnij).'))return;
+  try{await fmUsunPozycje([e]);nt('🗑 Usunięto z kolejki');}
+  catch(err){nt('❌ Nie udało się usunąć: '+err.message);}
+  await fmInit();
+}
+async function fmUsunDostawce(nazwa){
+  if(!nazwa)return;
+  const lista=FM.kolejka.filter(e=>String(e.ost.dostawca||'(bez nazwy)')===nazwa);
+  if(!lista.length)return;
+  if(!confirm('Usunąć z kolejki WSZYSTKIE pozycje dostawcy:\n\n'+nazwa+'\n\n('+lista.length+' pozycji, np. '+lista.slice(0,3).map(e=>e.nazwa).join('; ')+')\n\nBędą pomijane także na przyszłych fakturach. Cofniesz to w „Zapamiętane przypisania".'))return;
+  try{await fmUsunPozycje(lista);nt('🗑 Usunięto '+lista.length+' pozycji od: '+nazwa);}
+  catch(err){nt('❌ Nie udało się usunąć: '+err.message);}
+  await fmInit();
+}
 async function fmZatwierdz(){
   const btn=document.getElementById('fm-apply-btn');
   const wybrane=fmWidok().widoczne.filter(e=>e.zazn&&e.prodId&&fmOcena(e).ok)
