@@ -3229,14 +3229,11 @@ function xmlSetProd(nazwaFaktury, prodId, idx){
 }
 
 function xmlAutoMatch(){
+  const ctxXml=fmBudujDopasowanie();
   xmlPozycje.forEach(poz=>{
     if(xmlMappings[poz.nazwaFaktury]?.prodId) return;
-    const q = (xmlMappings[poz.nazwaFaktury]?.customName || poz.skrocona).toLowerCase();
-    let best=null, bestS=0;
-    PR.forEach(p=>{
-      const s = xmlSimilarity(q, p.nazwa.toLowerCase());
-      if(s>bestS&&s>0.3){bestS=s;best=p;}
-    });
+    const k = fmKandydaci(xmlMappings[poz.nazwaFaktury]?.customName || poz.nazwaFaktury, ctxXml);
+    const best = k.length&&k[0].score>=0.45 ? k[0].p : null;
     if(best){
       if(!xmlMappings[poz.nazwaFaktury]) xmlMappings[poz.nazwaFaktury]={};
       xmlMappings[poz.nazwaFaktury].prodId = best.id;
@@ -3254,6 +3251,56 @@ function xmlSimilarity(a,b){
   if(!wA.length)return 0;
   const m=wA.filter(w=>wB.some(wb=>wb.includes(w)||w.includes(wb)));
   return m.length/wA.length;
+}
+
+// ══ DOPASOWANIE NAZW (faktura → produkt) ══
+// Ignoruje gramatury, jednostki, marki w {} i []; odporne na odmiany (kurczak/kurczaka) i kolejnosc slow;
+// rzadkie slowa (camembert) waza wiecej niz ogolne (ser); uczy sie z juz potwierdzonych przypisan (aliasy).
+const FM_STOP=new Set(['szt','sztuk','opak','kg','kilo','dag','ml','gr','gram','bulk','kart','karton','tacka','tacki','torba','woreczek','pud','pudelko','butla','but','sloik','sloj','puszka','paczka','wag','mrozony','mrozona','mrozone','swiezy','swieza','swieze','extra','premium','klasyczny','klasyczna','naturalny','naturalna','bez','dla','oraz','jest','typ','pol','cal','calosc','zest','mix','gotowy','gotowe']);
+function fmTok(str){
+  return String(str||'').toLowerCase().replace(/ł/g,'l').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\{[^}]*\}/g,' ').replace(/\[[^\]]*\]/g,' ').replace(/\([^)]*\)/g,' ')
+    .replace(/\d+(?:[.,]\d+)?\s*(?:x\s*\d+\s*)?(?:kg|g|l|ml|dag|szt|sztuk|cm|mm|%|gr)\b/g,' ')
+    .replace(/[^a-z0-9]+/g,' ').split(' ')
+    .filter(w=>w.length>=3&&!/^\d+$/.test(w)&&!/\d/.test(w)&&!FM_STOP.has(w));
+}
+function fmTokMatch(a,b){
+  if(a===b)return true;
+  const sh=Math.min(a.length,b.length);
+  if(Math.abs(a.length-b.length)>2)return false;   // odmiana (kurczak/kurczaka), nie inne slowo (maka/makaron)
+  let k=0;while(k<sh&&a[k]===b[k])k++;
+  return k>=(sh<=3?sh:Math.max(3,sh-1));
+}
+function fmBudujDopasowanie(){
+  const prods=PR.filter(p=>!p.deleted_at);
+  const df={};
+  prods.forEach(p=>{new Set(fmTok(p.nazwa).map(w=>w.slice(0,4))).forEach(k=>df[k]=(df[k]||0)+1);});
+  const N=prods.length+1;
+  const idf=w=>Math.log((N+1)/((df[w.slice(0,4)]||0)+1))+1;
+  const aliasy={};   // id produktu -> tablice tokenow z potwierdzonych nazw z faktur
+  Object.values(FM.map||{}).forEach(m=>{
+    if(!m||!m.potwierdzone||m.ignoruj||!m.prod_id)return;
+    const t=fmTok(m.nazwa_faktury);if(t.length)(aliasy[m.prod_id]=aliasy[m.prod_id]||[]).push(t);
+  });
+  return {idf,aliasy,prods:prods.map(p=>({p,tok:fmTok(p.nazwa)})).filter(x=>x.tok.length)};
+}
+function fmScoreTok(inv,prod,idf){
+  if(!inv.length||!prod.length)return 0;
+  let pm=0,pt=0,im=0,it=0;
+  prod.forEach(w=>{const wt=idf(w);pt+=wt;if(inv.some(x=>fmTokMatch(w,x)))pm+=wt;});
+  inv.forEach(w=>{const wt=idf(w);it+=wt;if(prod.some(x=>fmTokMatch(w,x)))im+=wt;});
+  return 0.65*(pm/pt)+0.35*(im/it);
+}
+// zwraca do 3 najlepszych kandydatow [{p,score}] (score 0..1)
+function fmKandydaci(nazwaFaktury,ctx){
+  const inv=fmTok(nazwaFaktury);if(!inv.length)return [];
+  const wyn=[];
+  ctx.prods.forEach(x=>{
+    let sc=fmScoreTok(inv,x.tok,ctx.idf);
+    (ctx.aliasy[x.p.id]||[]).forEach(a=>{const s2=fmScoreTok(inv,a,ctx.idf);if(s2>sc)sc=s2;});
+    if(sc>=0.3)wyn.push({p:x.p,score:sc});
+  });
+  return wyn.sort((a,b)=>b.score-a.score).slice(0,3);
 }
 
 function xmlUpdateApplyBtn(){
@@ -3511,6 +3558,7 @@ async function fmAutomat(poz){
   FM.auto=zmiany;
   // kolejka: jedna pozycja na unikalną nazwę z faktury (pokazujemy najnowszą fakturę)
   const stareWybory={};FM.kolejka.forEach(e=>stareWybory[e.nazwa]=e);
+  const dop=fmBudujDopasowanie();
   FM.kolejka=Object.keys(grupy).map(nazwa=>{
     const w=grupy[nazwa];
     const wazne=w.filter(fmWazna);
@@ -3519,12 +3567,12 @@ async function fmAutomat(poz){
     const parsed=parseNazwaFaktury(nazwa);
     let prodId='',zrodlo='';
     if(m&&fmProd(m.prod_id)){prodId=String(m.prod_id);zrodlo=m.potwierdzone?'potw':'dawne';}
-    else{
-      const q=parsed.skrocona.toLowerCase();let best=null,bestS=0;
-      PR.filter(p=>!p.deleted_at).forEach(p=>{const s=xmlSimilarity(q,p.nazwa.toLowerCase());if(s>bestS){bestS=s;best=p;}});
-      if(best&&bestS>=0.6){prodId=String(best.id);zrodlo='podp';}
+    let kand=[];
+    if(!(m&&fmProd(m.prod_id))){
+      kand=fmKandydaci(nazwa,dop);
+      if(kand.length&&kand[0].score>=0.55){prodId=String(kand[0].p.id);zrodlo='podp';}
     }
-    const e={nazwa,ids:w.map(x=>x.id),ost,ile:w.length,prodId,zrodlo,
+    const e={nazwa,ids:w.map(x=>x.id),ost,ile:w.length,prodId,zrodlo,kand,
       waga:(m&&parseFloat(m.waga_opak_g)>0)?parseFloat(m.waga_opak_g):(parsed.wagazOpak||0),
       zmiana:!!ost._zmiana,powod:ost._powod||'',zazn:false,skrocona:parsed.skrocona};
     // domyślnie zaznaczamy tylko dawne przypisania z importu XML, i tylko gdy cena wygląda rozsądnie
@@ -3591,9 +3639,11 @@ function fmRender(){
         <option value="">— wybierz produkt —</option>
         <option value="__ign"${e.prodId==='__ign'?' selected':''}>🚫 ignoruj zawsze (nie dotyczy food costu)</option>
         <option value="__new"${e.prodId==='__new'?' selected':''}>＋ dodaj jako nowy produkt</option>
-        ${e.prodId&&e.prodId[0]!=='_'?opcjeProd.replace(`value="${fmEsc(e.prodId)}"`,`value="${fmEsc(e.prodId)}" selected`):opcjeProd}
+        ${(e.kand&&e.kand.length)?'<optgroup label="Podpowiedzi (najbardziej podobne nazwy)">'+e.kand.map(k=>{const c=c1g(k.p);return `<option value="${fmEsc(k.p.id)}"${String(k.p.id)===e.prodId?' selected':''}>${fmEsc(k.p.nazwa)} — ${Math.round(k.score*100)}% · ${c>0?fmKg(c):'brak ceny'}</option>`;}).join('')+'</optgroup><optgroup label="Wszystkie produkty">':''}
+        ${e.prodId&&e.prodId[0]!=='_'&&!(e.kand||[]).some(k=>String(k.p.id)===e.prodId)?opcjeProd.replace(`value="${fmEsc(e.prodId)}"`,`value="${fmEsc(e.prodId)}" selected`):opcjeProd}
+        ${(e.kand&&e.kand.length)?'</optgroup>':''}
       </select>`
-        +(e.zrodlo==='podp'&&!e._ruszane?'<div style="font-size:.7rem;color:var(--mu);margin-top:2px">podpowiedź po nazwie — sprawdź</div>':'')
+        +(e.zrodlo==='podp'&&!e._ruszane?`<div style="font-size:.7rem;color:var(--mu);margin-top:2px">podpowiedź po nazwie (${Math.round(e.kand[0].score*100)}% zgodności) — sprawdź</div>`:(!e.prodId&&e.kand&&e.kand.length?'<div style="font-size:.7rem;color:var(--mu);margin-top:2px">brak pewnego dopasowania — zobacz podpowiedzi na górze listy</div>':''))
         +(e.zrodlo==='dawne'&&!e._ruszane?'<div style="font-size:.7rem;color:var(--mu);margin-top:2px">z wcześniejszego importu XML</div>':'');
       let cena='<span style="color:var(--mu)">—</span>';
       if(o.ign)cena='<span style="color:var(--mu);font-size:.78rem">nie będzie używana</span>';
