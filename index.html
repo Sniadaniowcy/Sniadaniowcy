@@ -622,7 +622,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
                 <th style="width:100px">Wartość</th>
                 <th style="min-width:200px">Produkt w bazie</th>
                 <th style="width:100px">Waga 1 szt</th>
-                <th style="width:140px">Cena za kg</th>
+                <th style="width:190px">Cena za kg i za g</th>
               </tr></thead>
               <tbody id="fm-tbody"></tbody>
             </table>
@@ -3367,6 +3367,8 @@ const FM = { gotowe:false, brakTabel:false, blad:'', map:{}, kolejka:[], log:[],
 
 function fmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function fmKg(v){return v>0?(v*1000).toFixed(2)+' zł/kg':'—';}
+function fmG(v){return v>0?(v>=0.01?v.toFixed(4):v.toFixed(5))+' zł/g':'—';}
+function fmKgG(v){return v>0?fmKg(v)+' · '+fmG(v):'—';}
 function fmOdm(n,jedna,dwie,piec){const d=n%10,s=n%100;return n+' '+(n===1?jedna:(d>=2&&d<=4&&!(s>=12&&s<=14))?dwie:piec);}
 function fmCen(n){return fmOdm(n,'cenę','ceny','cen');}
 
@@ -3579,7 +3581,7 @@ function fmRender(){
   qw.style.display=n?'block':'none';
   if(n){
     const {lista,stron,widoczne}=fmWidok();
-    const opcjeProd=PR.filter(p=>!p.deleted_at).slice().sort((a,b)=>a.nazwa.localeCompare(b.nazwa,'pl')).map(p=>`<option value="${fmEsc(p.id)}">${fmEsc(p.nazwa)}</option>`).join('');
+    const opcjeProd=PR.filter(p=>!p.deleted_at).slice().sort((a,b)=>a.nazwa.localeCompare(b.nazwa,'pl')).map(p=>{const c=c1g(p);return `<option value="${fmEsc(p.id)}">${fmEsc(p.nazwa)} — ${c>0?fmKg(c)+' / '+fmG(c):'brak ceny'}</option>`;}).join('');
     document.getElementById('fm-tbody').innerHTML=widoczne.map(e=>{
       const i=FM.kolejka.indexOf(e),o=fmOcena(e),p=e.ost,ww=fmWartosc(p),szt=fmJedn(p.jednostka)==='szt';
       const sel=`<select style="font-size:.8rem;width:100%;padding:5px 7px" onchange="fmUstaw(${i},'prodId',this.value)">
@@ -3596,7 +3598,9 @@ function fmRender(){
       else if(e.prodId){
         const proc=o.stare>0?((o.nowe/o.stare-1)*100):null;
         cena=`<div style="font-weight:700;color:var(--ac)">${fmKg(o.nowe)}</div>`
-          +`<div style="font-size:.72rem;color:var(--mu)">obecnie: ${fmKg(o.stare)}</div>`
+          +`<div style="font-size:.74rem;color:var(--ac)">${fmG(o.nowe)}</div>`
+          +`<div style="font-size:.72rem;color:var(--mu);margin-top:2px">obecnie: ${fmKg(o.stare)}</div>`
+          +`<div style="font-size:.72rem;color:var(--mu)">obecnie: ${fmG(o.stare)}</div>`
           +(proc!==null?`<div style="font-size:.74rem;font-weight:600;color:${o.duza?'var(--red)':'var(--green)'}">${proc>=0?'+':''}${proc.toFixed(1)}%${o.duza?' ⚠ duża zmiana':''}</div>`:'')
           +(o.netto?'<div style="font-size:.7rem;color:var(--gold)">cena netto (brak VAT w danych)</div>':'');
       }
@@ -3627,7 +3631,7 @@ function fmRender(){
   // HISTORIA
   lw.style.display=FM.log.length?'block':'none';
   if(FM.log.length){
-    document.getElementById('fm-log').innerHTML='<div class="tw"><table><thead><tr><th style="width:140px">Kiedy</th><th>Produkt</th><th>Pozycja z faktury</th><th style="width:110px">Było</th><th style="width:110px">Jest</th><th style="width:80px">Zmiana</th></tr></thead><tbody>'
+    document.getElementById('fm-log').innerHTML='<div class="tw"><table><thead><tr><th style="width:140px">Kiedy</th><th>Produkt</th><th>Pozycja z faktury</th><th style="width:130px">Było</th><th style="width:130px">Jest</th><th style="width:80px">Zmiana</th></tr></thead><tbody>'
       +FM.log.map(l=>{
         const prod=PR.find(p=>String(p.id)===String(l.produkt_id));
         const s=parseFloat(l.stara_cena_1g)||0,nw=parseFloat(l.nowa_cena_1g)||0;
@@ -3635,8 +3639,8 @@ function fmRender(){
         return `<tr><td style="font-size:.76rem;color:var(--mu)">${l.zastosowano_at?new Date(l.zastosowano_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}</td>
           <td style="font-size:.84rem">${fmEsc(prod?prod.nazwa:'(usunięty produkt)')}</td>
           <td style="font-size:.76rem;color:var(--mu)">${fmEsc(l.nazwa)}<br>${fmEsc(l.dostawca||'')} · ${fmEsc(l.data_faktury||'')} · nr ${fmEsc(l.numer||'')}</td>
-          <td style="text-align:right;font-size:.8rem;color:var(--mu)">${fmKg(s)}</td>
-          <td style="text-align:right;font-size:.8rem;font-weight:600">${fmKg(nw)}</td>
+          <td style="text-align:right;font-size:.8rem;color:var(--mu)">${fmKg(s)}<br><span style="font-size:.7rem">${fmG(s)}</span></td>
+          <td style="text-align:right;font-size:.8rem;font-weight:600">${fmKg(nw)}<br><span style="font-size:.7rem;font-weight:400">${fmG(nw)}</span></td>
           <td style="text-align:right;font-size:.8rem;font-weight:600;color:${proc===null?'var(--mu)':proc>0?'var(--red)':'var(--green)'}">${proc===null?'nowa':(proc>=0?'+':'')+proc.toFixed(1)+'%'}</td></tr>`;
       }).join('')+'</tbody></table></div>';
   }
@@ -3654,13 +3658,14 @@ function fmRenderMapy(){
     .filter(x=>!q||x.m.nazwa_faktury.toLowerCase().includes(q)||(x.prod&&x.prod.nazwa.toLowerCase().includes(q)))
     .sort((a,b)=>a.m.nazwa_faktury.localeCompare(b.m.nazwa_faktury,'pl'));
   const pokaz=lista.slice(0,150);
-  document.getElementById('fm-map').innerHTML='<div class="tw"><table><thead><tr><th>Nazwa na fakturze</th><th>Co się z nią dzieje</th><th style="width:90px">Waga 1 szt</th><th style="width:110px"></th></tr></thead><tbody>'
+  document.getElementById('fm-map').innerHTML='<div class="tw"><table><thead><tr><th>Nazwa na fakturze</th><th>Co się z nią dzieje</th><th style="width:90px">Waga 1 szt</th><th style="width:150px">Obecna cena</th><th style="width:110px"></th></tr></thead><tbody>'
     +pokaz.map(x=>{
       const i=wszystkie.indexOf(x.m);
       const co=x.m.ignoruj?'<span style="color:var(--mu)">🚫 ignorowana</span>'
         :x.prod?'→ <strong>'+fmEsc(x.prod.nazwa)+'</strong>':'<span style="color:var(--red)">produkt usunięty — pozycja wróci do kolejki</span>';
       return `<tr><td style="font-size:.82rem">${fmEsc(x.m.nazwa_faktury)}</td><td style="font-size:.84rem">${co}</td>
         <td style="text-align:center;font-size:.8rem;color:var(--mu)">${parseFloat(x.m.waga_opak_g)>0?parseFloat(x.m.waga_opak_g)+' g':'—'}</td>
+        <td style="text-align:right;font-size:.8rem">${x.prod&&!x.m.ignoruj?(()=>{const c=c1g(x.prod);return c>0?'<strong>'+fmKg(c)+'</strong><div style="font-size:.72rem;color:var(--mu)">'+fmG(c)+'</div>':'<span style="color:var(--mu)">brak ceny</span>';})():'<span style="color:var(--mu)">—</span>'}</td>
         <td style="text-align:right"><button class="btn bgh sm" onclick="fmUsunMape(${i})">Cofnij</button></td></tr>`;
     }).join('')+'</tbody></table></div>'
     +(lista.length>pokaz.length?`<div style="font-size:.78rem;color:var(--mu);margin-top:6px">Pokazano 150 z ${lista.length} — zawęź wyszukiwaniem.</div>`:'');
