@@ -225,6 +225,8 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
 #bob th:first-child, #bfb th:first-child{min-width:30px;max-width:40px;width:40px}
 #bob td:nth-child(2), #bfb td:nth-child(2),
 #bob th:nth-child(2), #bfb th:nth-child(2){min-width:120px}
+.fm-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#3ddc84;margin-left:4px;vertical-align:middle;box-shadow:0 0 5px 1px rgba(61,220,132,.75);animation:fmglow 2.8s ease-in-out infinite;cursor:help}
+@keyframes fmglow{0%,100%{box-shadow:0 0 4px 1px rgba(61,220,132,.55)}50%{box-shadow:0 0 8px 2px rgba(61,220,132,.95)}}
 </style>
 </head>
 <body>
@@ -304,6 +306,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn" onclick="document.getElementById('csv-inp').click()" style="background:rgba(255,217,26,.2);color:var(--ac);border:1px solid rgba(255,217,26,.4)">📂 Importuj CSV</button>
         <button class="btn" onclick="exportBase('produkty')" style="background:rgba(91,155,213,.2);color:#5B9BD5;border:1px solid rgba(91,155,213,.4)">📤 Eksportuj CSV</button>
         <input type="file" id="csv-inp" accept=".csv" style="display:none" onchange="loadCSV(this)">
+        <button class="btn bgh sm" id="fm-bez-btn" onclick="fmPrzelaczBezFaktury()" title="Pokaż tylko produkty, które nie są jeszcze połączone z żadną pozycją faktury">🔗 Bez faktury</button>
         <input type="text" id="sp" placeholder="🔍 Szukaj…" style="width:180px" oninput="debSearch(renP,'prod')">
       </div></div>
       <div class="tw"><table><thead><tr>
@@ -1249,6 +1252,7 @@ function renP(){
   const af=activeFolder['prod']||'__all__';
   let list=PR.filter(p=>!p.deleted_at).filter(p=>{
     if(q && !(p.nazwa.toLowerCase().includes(q)||(p.firma||'').toLowerCase().includes(q))) return false;
+    if(FM_BEZ_FAKTURY && fmPowiazania().has(p.id)) return false;
     if(af==='__all__')  return true;
     if(af==='__none__') return !p.kategoria;
     return p.kategoria===af;
@@ -1274,7 +1278,7 @@ function renP(){
   const tb=document.getElementById('pb');tb.innerHTML='';
   list.forEach(p=>{
     const g=c1g(p);
-    let c=`<td><input type="checkbox" class="ck" data-id="${p.id}"></td>`;
+    let c=`<td><input type="checkbox" class="ck" data-id="${p.id}">${fmKropkaHtml(p.id)}</td>`;
     // Kolumna kategoria (badge + edytowalna przez prawy klik)
     const katBadge=p.kategoria
       ?`<span style="background:rgba(237,179,19,.15);border:1px solid rgba(237,179,19,.3);color:var(--ac);border-radius:10px;padding:1px 7px;font-size:.7rem">${p.kategoria}</span>`
@@ -1294,6 +1298,7 @@ function renP(){
     tb.appendChild(tr);
   });
   renderFolders('prod');
+  fmAktualizujLicznikBez();
 }
 let uT={};
 function upP(id,f,v){
@@ -3326,6 +3331,32 @@ async function xmlApplyPrices(){
 // Przypisania są w tabeli faktury_mapowania (wspólne dla wszystkich urządzeń).
 const FM_MAX_ZMIANA = 0.40;
 const FM_NA_STRONE = 40;
+// --- Kropka przy produktach powiazanych z pozycja faktury (zywa lista z faktury_mapowania) ---
+let FM_BEZ_FAKTURY=false;
+function fmPowiazania(){   // Map: id produktu -> [nazwy pozycji z faktur]
+  const w=new Map();
+  Object.values(FM.map||{}).forEach(m=>{
+    if(!m||!m.potwierdzone||m.ignoruj||!m.prod_id)return;
+    if(!w.has(m.prod_id))w.set(m.prod_id,[]);
+    w.get(m.prod_id).push(m.nazwa_faktury);
+  });
+  return w;
+}
+function fmKropkaHtml(id){
+  const n=fmPowiazania().get(id);
+  if(!n)return '';
+  const tip='Połączony z fakturą — cena aktualizuje się sama:\n'+n.join('\n');
+  return `<span class="fm-dot" title="${tip.replace(/"/g,'&quot;')}"></span>`;
+}
+function fmAktualizujLicznikBez(){
+  const b=document.getElementById('fm-bez-btn');if(!b)return;
+  const pow=fmPowiazania();
+  const wszystkie=PR.filter(p=>!p.deleted_at);
+  const bez=wszystkie.filter(p=>!pow.has(p.id)).length;
+  b.textContent=(FM_BEZ_FAKTURY?'✓ ':'🔗 ')+'Bez faktury ('+bez+' z '+wszystkie.length+')';
+  b.style.borderColor=FM_BEZ_FAKTURY?'var(--ac)':'';
+}
+function fmPrzelaczBezFaktury(){FM_BEZ_FAKTURY=!FM_BEZ_FAKTURY;renP();}
 const FM = { gotowe:false, brakTabel:false, blad:'', map:{}, kolejka:[], log:[], strona:0, szukaj:'', auto:[], trwa:false, bezCeny:0 };
 
 function fmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
@@ -3431,6 +3462,7 @@ async function fmInit(){
   }finally{
     FM.trwa=false;
     fmRender();
+    try{ if(typeof PR!=='undefined'&&PR.length&&document.getElementById('pb')&&!document.activeElement?.closest?.('#pb'))renP(); else fmAktualizujLicznikBez(); }catch(e){}
   }
 }
 
