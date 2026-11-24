@@ -1301,6 +1301,7 @@ function renP(){
       const tdN=tr.children[3];
       if(tdN){tdN.style.position='relative';const inp=tdN.querySelector('input');if(inp)inp.style.paddingLeft='16px';
         tdN.insertAdjacentHTML('afterbegin',fmKropkaHtml(p.id).replace('class="fm-dot"','class="fm-dot" style="position:absolute;left:5px;top:50%;margin:-3px 0 0 0;z-index:1"'));}
+      fmZablokujCeny(tr,p);
     }
     tb.appendChild(tr);
   });
@@ -3385,6 +3386,27 @@ async function xmlApplyPrices(){
 // Przypisania są w tabeli faktury_mapowania (wspólne dla wszystkich urządzeń).
 const FM_MAX_ZMIANA = 0.40;
 const FM_NA_STRONE = 40;
+// --- Blokada recznej edycji cen produktow polaczonych z faktura (odblokowanie po potwierdzeniu) ---
+const FM_ODBL=new Set();
+function fmZablokujCeny(tr,p){
+  const nazwy=(fmPowiazania().get(p.id)||[]).join(', ');
+  const etyk={ilosc_zakupu:'ilość zakupu',jednostka:'jednostka',waga_opak_g:'waga opakowania',cena_zakupu:'cena zakupu'};
+  Object.keys(etyk).forEach(k=>{
+    if(FM_ODBL.has(p.id+':'+k))return;
+    const el=tr.querySelector(`[onchange*="'${k}'"]`);if(!el)return;
+    const td=el.closest('td');td.style.position='relative';
+    el.disabled=true;el.style.opacity='.45';
+    const ov=document.createElement('div');
+    ov.textContent='🔒';ov.title='Ta wartość uzupełnia się sama z faktur. Kliknij, aby zmienić ręcznie.';
+    ov.style.cssText='position:absolute;inset:0;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:flex-end;padding-right:3px;font-size:.62rem;opacity:.75';
+    ov.onclick=ev=>{
+      ev.stopPropagation();
+      if(!confirm('🔒 „'+p.nazwa+'": pole „'+etyk[k]+'" uzupełnia się samo z faktur (połączono z: '+nazwy+').\n\nRęczna zmiana zostanie nadpisana przy najbliższej fakturze z tym produktem.\n\nCzy na pewno chcesz zmienić ją ręcznie?'))return;
+      FM_ODBL.add(p.id+':'+k);el.disabled=false;el.style.opacity='';ov.remove();el.focus();
+    };
+    td.appendChild(ov);
+  });
+}
 // --- Kropka przy produktach powiazanych z pozycja faktury (zywa lista z faktury_mapowania) ---
 let FM_BEZ_FAKTURY=false;
 function fmPowiazania(){   // Map: id produktu -> [nazwy pozycji z faktur]
