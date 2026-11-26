@@ -309,6 +309,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn bgh sm" id="fm-bez-btn" onclick="fmPrzelaczBezFaktury()" title="Pokaż tylko produkty, które nie są jeszcze połączone z żadną pozycją faktury">🔗 Bez faktury</button>
         <input type="text" id="sp" placeholder="🔍 Szukaj…" style="width:180px" oninput="debSearch(renP,'prod')">
       </div></div>
+      <div id="fm-blad-banner" style="display:none;margin:0 0 10px;padding:10px 14px;border:1px solid var(--red,#e5484d);background:rgba(229,72,77,.12);border-radius:8px;font-size:.82rem"></div>
       <div class="tw"><table><thead><tr>
         <th style="width:34px"><input type="checkbox" id="ca" onchange="togA(this)"></th>
         <th style="width:100px">Kategoria</th><th style="width:95px">Firma</th><th style="width:170px">Nazwa *</th><th style="width:190px">Pełny skład</th><th style="width:115px">Alergeny</th><th style="width:115px">Może zawierać</th>
@@ -570,6 +571,7 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
         <button class="btn bb sm" onclick="ltk('fc')">✏ Wczytaj do kalkulatora</button>
         <button class="btn br sm" onclick="dB('fc')">🗑 Do kosza</button>
         <button class="btn bgh sm" onclick="showTrash('fc')" id="trash-btn-fc">🗑 Kosz (<span id="trash-count-fc">0</span>)</button>
+        <button class="btn bgh sm" title="Przelicz koszty wszystkich dań według aktualnych cen produktów" onclick="this.disabled=true;rcB().then(()=>{renBF();renBO();nt('✅ Food cost wszystkich dań przeliczony');}).finally(()=>this.disabled=false)">↻ Przelicz wszystkie dania</button>
         <input type="text" id="search-fc" placeholder="🔍 Szukaj dania…" style="width:200px" oninput="debSearch(renBF,'fc')">
         <button class="btn sm" onclick="exportBase('baza_fc')" style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)">📤 Eksport CSV</button>
         <button class="btn sm" onclick="document.getElementById('imp-fc').click()" style="background:rgba(237,179,19,.15);color:var(--ac);border:1px solid rgba(237,179,19,.3)">📥 Import CSV</button>
@@ -1183,7 +1185,7 @@ const nf=(v,d=2)=>{
 const zl=v=>(parseFloat(v)||0).toFixed(2)+' zł';
 const nt=msg=>{const e=document.getElementById('nf');e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2800);};
 const cpEl=id=>{navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>nt('📋 Skopiowano!'));};
-const c1g=p=>{const i=parseFloat(p.ilosc_zakupu)||1,j=(p.jednostka||'kg').toLowerCase(),w=parseFloat(p.waga_opak_g)||0,c=parseFloat(p.cena_zakupu)||0,m={kg:1000,g:1,dag:10,l:1000,ml:1,szt:w,opak:w}[j]||1;return(!m||!i)?0:c/(i*m);};
+const c1g=p=>{const i=parseFloat(p.ilosc_zakupu)||1,j=(p.jednostka||'kg').toLowerCase(),w=parseFloat(p.waga_opak_g)||0,c=parseFloat(p.cena_zakupu)||0,m={kg:1000,g:1,dag:10,l:1000,ml:1,szt:w,opak:w}[j]||1;return(!m||!i||c<0||i<0||m<0)?0:c/(i*m);};
 const NF=['kcal','tluszcze','tluszcze_nas','weglowodany','cukry','bialka','sole','ilosc_zakupu','waga_opak_g','cena_zakupu'];
 const PFD=[{k:'firma',t:'tx',w:80},{k:'nazwa',t:'tx',w:130},{k:'pelny_sklad',t:'tx',w:150},{k:'alergeny',t:'tx',w:100},{k:'moze_zawierac',t:'tx',w:100},{k:'kcal',t:'nm',w:52},{k:'tluszcze',t:'nm',w:64},{k:'tluszcze_nas',t:'nm',w:56},{k:'weglowodany',t:'nm',w:64},{k:'cukry',t:'nm',w:52},{k:'bialka',t:'nm',w:56},{k:'sole',t:'nm',w:52},{k:'ilosc_zakupu',t:'nm',w:56},{k:'jednostka',t:'sl',w:62,o:['kg','g','dag','l','ml','szt','opak']},{k:'waga_opak_g',t:'nm',w:72},{k:'cena_zakupu',t:'nm',w:80}];
 
@@ -1307,6 +1309,7 @@ function renP(){
   });
   renderFolders('prod');
   fmAktualizujLicznikBez();
+  fmBanerBledow();
 }
 let uT={};
 function upP(id,f,v){
@@ -1480,6 +1483,21 @@ function aKR(parentId){
 }
 
 // Renderuj wszystkie wiersze kalkulatora z zachowaniem hierarchii
+// Koszt kazdego skladnika przy wierszu w Kalkulatorze (zl i zl/kg) + ostrzezenia (ujemna cena, brak ceny, duplikat nazwy)
+function fmKalkKoszty(){
+  const wg={};PR.filter(p=>!p.deleted_at).forEach(p=>(wg[p.nazwa]=wg[p.nazwa]||[]).push(p));
+  const surowa=p=>{const i=parseFloat(p.ilosc_zakupu)||1,j=(p.jednostka||'kg').toLowerCase(),w=parseFloat(p.waga_opak_g)||0,c=parseFloat(p.cena_zakupu)||0,m={kg:1000,g:1,dag:10,l:1000,ml:1,szt:w,opak:w}[j]||1;return(!m||!i)?0:c/(i*m);};
+  document.querySelectorAll('#kr .kr').forEach(div=>{
+    const row=kR.find(r=>r.id===div.dataset.id),b=div.querySelector('.kr-koszt');if(!row||!b)return;
+    const ps=row.n?wg[row.n]:null;
+    if(!row.n||!ps){b.innerHTML=row.n&&!row.isGroup?'<span title="Nie ma produktu o takiej nazwie w Bazie Produktów">brak w bazie</span>':'';return;}
+    const p=ps[ps.length-1],raw=surowa(p),c=c1g(p),w=parseFloat(row.w)||0;
+    const dup=ps.length>1?`<div style="color:#e5484d" title="Dwa produkty o tej samej nazwie — liczy się ostatni z listy. Usuń lub zmień nazwę duplikatu.">⚠ ${ps.length} produkty o tej nazwie</div>`:'';
+    if(raw<0)b.innerHTML=`<div style="color:#e5484d;font-weight:700" title="Produkt ma ujemną cenę/ilość/wagę — popraw go w Bazie Produktów">⚠ ujemna cena: ${(raw*1000).toFixed(2)} zł/kg</div>${dup}`;
+    else if(!(c>0))b.innerHTML=`<div style="color:#d98a00" title="Produkt nie ma ceny lub wagi opakowania">brak ceny</div>${dup}`;
+    else b.innerHTML=`<div style="color:var(--text,#e8e8f0);font-weight:600">${(c*w).toFixed(2)} zł</div><div>${(c*1000).toFixed(2)} zł/kg</div>${dup}`;
+  });
+}
 function renderKalkRows(){
   const cont=document.getElementById('kr');
   if(!cont)return;
@@ -1502,6 +1520,7 @@ function renderKalkRows(){
       cont.appendChild(addBtn);
     }
   });
+  fmKalkKoszty();
 }
 
 function buildKalkRow(row){
@@ -1535,6 +1554,7 @@ function buildKalkRow(row){
         </div>
         <input type="number" placeholder="waga (g)" min="0" step="0.1" value="${row.w||''}"
           oninput="kW(this,'${row.id}')" style="font-size:.84rem;width:90px">
+        <span class="kr-koszt" style="min-width:130px;text-align:right;font-size:.74rem;line-height:1.25;color:var(--mu)"></span>
         ${actionBtns}
         <button onclick="rKR('${row.id}')" style="background:var(--s2);border:none;border-radius:6px;cursor:pointer;font-size:.95rem;color:var(--mu);padding:4px 7px">✕</button>
       </div>
@@ -1699,6 +1719,7 @@ function gKD(){
 }
 function rc(){
   const{t,us}=gKD();
+  try{fmKalkKoszty();}catch(e){}
   const sumaWag=t.wg||1; // suma surowych składników
   // Waga na 100g: użyj wpisanej WAGA DANIA jeśli podana, inaczej suma składników
   const wagaDania=parseFloat(document.getElementById('waga-dania')?.value)||0;
@@ -3317,13 +3338,14 @@ function xmlUpdateApplyBtn(){
 async function xmlApplyPrices(){
   const btn=document.getElementById('xml-apply-btn');
   btn.textContent='⏳ Aktualizuję…';btn.disabled=true;
-  let updated=0, added=0;
+  let updated=0, added=0, pominieteBlad=0;
 
   for(const poz of xmlPozycje){
     const m = xmlMappings[poz.nazwaFaktury] || {};
     const customName = m.customName || poz.skrocona;
     if(!customName && !m.prodId) continue; // nic nie wpisane, pomijamy
 
+    if(!(parseFloat(poz.ilosc)>0)||!(parseFloat(poz.wartosc_brutto)>0)){pominieteBlad++;continue;}   // korekty / zerowe / ujemne pozycje
     const newData = {
       cena_zakupu:  poz.wartosc_brutto,
       ilosc_zakupu: poz.ilosc,
@@ -3371,7 +3393,7 @@ async function xmlApplyPrices(){
   btn.innerHTML=`✅ Zaktualizuj ceny (<span id="xml-match-count">${xmlPozycje.filter(p=>xmlMappings[p.nazwaFaktury]?.prodId||(xmlMappings[p.nazwaFaktury]?.customName||p.skrocona)).length}</span> produktów)`;
   btn.disabled=false;
   const msg = [updated && `zaktualizowano ${updated}`, added && `dodano ${added} nowych`].filter(Boolean).join(', ');
-  nt(`✅ ${msg} produktów! Food cost przeliczony.`);
+  nt(`✅ ${msg} produktów! Food cost przeliczony.`+(pominieteBlad?` Pominięto ${pominieteBlad} pozycji z ujemną/zerową ilością lub ceną (np. korekty).`:''));
   renP();
 }
 
@@ -3433,6 +3455,26 @@ function fmAktualizujLicznikBez(){
   b.style.borderColor=FM_BEZ_FAKTURY?'var(--ac)':'';
 }
 function fmPrzelaczBezFaktury(){FM_BEZ_FAKTURY=!FM_BEZ_FAKTURY;renP();}
+// Produkty z ujemna lub nieprawidlowa cena/ilosc/waga (liczone jako "brak ceny", ale trzeba je poprawic)
+function fmBledneProdukty(){
+  return PR.filter(p=>!p.deleted_at).map(p=>{
+    const pr=[];
+    ['cena_zakupu','ilosc_zakupu','waga_opak_g'].forEach(k=>{const v=parseFloat(p[k]);if(v<0)pr.push((k==='cena_zakupu'?'cena':k==='ilosc_zakupu'?'ilość':'waga opak.')+' '+v);});
+    return pr.length?{p,pr}:null;
+  }).filter(Boolean);
+}
+function fmBanerBledow(){
+  const el=document.getElementById('fm-blad-banner');if(!el)return;
+  const b=fmBledneProdukty();
+  const dania=[...new Set([...(typeof BF!=='undefined'?BF:[]),...(typeof BO!=='undefined'?BO:[])].filter(d=>!d.deleted_at&&(d.skladniki||[]).some(sk=>parseFloat(sk.waga)<0)).map(d=>d.nazwa||d.nazwa_dania||'(bez nazwy)'))];
+  if(!b.length&&!dania.length){el.style.display='none';return;}
+  const dh=dania.length?'<div style="margin-top:6px"><strong>⚠ Dania z ujemną wagą składnika:</strong> '+dania.slice(0,10).map(fmEsc).join(' &middot; ')+' <span style="color:var(--mu)">(popraw wagę w Kalkulatorze)</span></div>':'';
+  if(!b.length){el.style.display='block';el.innerHTML=dh;return;}
+  el.style.display='block';
+  el.innerHTML='<strong>⚠ '+b.length+' '+(b.length===1?'produkt ma ujemną wartość':'produktów ma ujemne wartości')+' (cena, ilość lub waga) — liczone jako „brak ceny", popraw je:</strong><br>'
+    +b.slice(0,12).map(x=>fmEsc(x.p.nazwa)+' <span style="color:var(--mu)">('+x.pr.join(', ')+')</span>').join(' &middot; ')+(b.length>12?' &middot; …':'')
+    +'<br><button class="btn bgh sm" style="margin-top:6px" onclick="rcB().then(()=>{renP();nt(\'✅ Food cost przeliczony\');})">↻ Przelicz food cost dań po poprawce</button>'+dh;
+}
 const FM = { gotowe:false, brakTabel:false, blad:'', map:{}, kolejka:[], log:[], strona:0, szukaj:'', auto:[], trwa:false, bezCeny:0 };
 
 function fmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
