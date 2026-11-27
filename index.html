@@ -648,61 +648,6 @@ tbody tr[draggable]:active{cursor:grabbing;opacity:.7}
           <div id="fm-log" style="margin-top:10px"></div>
         </details>
       </div>
-
-      <p class="pt" style="font-size:1.05rem">Ręczny import z pliku XML</p>
-      <p class="ps">Awaryjnie lub dla pojedynczej faktury: wczytaj plik XML z Elisoft/KSeF → przypisz pozycje → zaktualizuj ceny.</p>
-
-      <!-- Upload area -->
-      <div id="xml-upload-area" style="border:2px dashed var(--bo);border-radius:var(--r);padding:40px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px;background:var(--s)"
-        onclick="document.getElementById('xml-file-inp').click()"
-        ondragover="event.preventDefault();this.style.borderColor='var(--ac)'"
-        ondragleave="this.style.borderColor='var(--bo)'"
-        ondrop="event.preventDefault();this.style.borderColor='var(--bo)';handleXmlDrop(event)">
-        <div style="font-size:2.5rem;margin-bottom:10px">🧾</div>
-        <div style="font-weight:600;color:var(--tx);margin-bottom:6px">Przeciągnij plik XML lub kliknij żeby wybrać</div>
-        <div style="font-size:.82rem;color:var(--mu)">Format: KSeF FA(2)/FA(3) z Elisoft</div>
-        <input type="file" id="xml-file-inp" accept=".xml,.XML" style="display:none" onchange="loadXmlFile(this)">
-      </div>
-
-      <!-- Faktura info -->
-      <div id="xml-faktura-info" style="display:none;margin-bottom:16px">
-        <div style="background:var(--s2);border:1px solid var(--bo);border-radius:var(--r);padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap">
-          <div><div style="font-size:.75rem;color:var(--mu);margin-bottom:3px">Dostawca</div><div style="font-weight:700;color:var(--ac)" id="xml-dostawca">—</div></div>
-          <div><div style="font-size:.75rem;color:var(--mu);margin-bottom:3px">Numer faktury</div><div style="font-weight:600;color:var(--tx)" id="xml-numer">—</div></div>
-          <div><div style="font-size:.75rem;color:var(--mu);margin-bottom:3px">Data</div><div style="font-weight:600;color:var(--tx)" id="xml-data">—</div></div>
-          <div><div style="font-size:.75rem;color:var(--mu);margin-bottom:3px">Pozycji</div><div style="font-weight:600;color:var(--tx)" id="xml-pozycji">—</div></div>
-          <div><div style="font-size:.75rem;color:var(--mu);margin-bottom:3px">Wartość netto</div><div style="font-weight:700;color:var(--green)" id="xml-wartosc">—</div></div>
-        </div>
-      </div>
-
-      <!-- Pozycje tabela -->
-      <div id="xml-pozycje-wrap" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <div style="font-weight:600;color:var(--tx);font-size:.95rem">Pozycje faktury — przypisz do produktów w bazie</div>
-          <div style="display:flex;gap:8px">
-            <button class="btn bgh sm" onclick="xmlAutoMatch()">⚡ Auto-dopasuj</button>
-            <button class="btn bg" onclick="xmlApplyPrices()" id="xml-apply-btn" style="display:none">✅ Zaktualizuj ceny (<span id="xml-match-count">0</span> produktów)</button>
-          </div>
-        </div>
-        <div class="tw">
-          <table>
-            <thead><tr>
-              <th style="width:36px">#</th>
-              <th style="min-width:220px">Nazwa z faktury / Twoja nazwa</th>
-              <th style="width:90px">Ilość</th>
-              <th style="width:130px">Opak. (szt × g)</th>
-              <th style="width:120px">Cena brutto/szt</th>
-              <th>Produkt w bazie NutriCalc</th>
-              <th style="width:110px">Cena w bazie</th>
-              <th style="width:70px">Status</th>
-            </tr></thead>
-            <tbody id="xml-tbody"></tbody>
-          </table>
-        </div>
-        <div style="margin-top:12px;font-size:.8rem;color:var(--mu)">
-          💡 Przypisania są zapamiętywane — następnym razem ta sama nazwa z faktury zostanie dopasowana automatycznie.
-        </div>
-      </div>
     </div>
 </div>
 </div>
@@ -3020,30 +2965,8 @@ function closeCSV(){
 
 
 // ══════════════════════════════════════════════
-// XML IMPORT FAKTURY (KSeF FA3 / Elisoft)
+// PARSOWANIE NAZW Z FAKTUR
 // ══════════════════════════════════════════════
-let xmlPozycje = [];
-let xmlMappings = {}; // nazwa_z_faktury -> {prodId, customName, ilosc, waga_g, jednostka}
-
-function xmlSaveMappings(){ try{localStorage.setItem('xml_mappings2', JSON.stringify(xmlMappings));}catch(e){} }
-function xmlLoadMappings(){ try{const d=localStorage.getItem('xml_mappings2');if(d)xmlMappings=JSON.parse(d);}catch(e){} }
-xmlLoadMappings();
-
-function handleXmlDrop(e){
-  const file = e.dataTransfer.files[0];
-  if(file) processXmlFile(file);
-}
-function loadXmlFile(inp){
-  const file = inp.files[0];
-  if(file) processXmlFile(file);
-  inp.value = '';
-}
-function processXmlFile(file){
-  const reader = new FileReader();
-  reader.onload = e => { try{ parseXmlFaktura(e.target.result, file.name); }catch(err){ nt('❌ Błąd: '+err.message); } };
-  reader.readAsText(file, 'UTF-8');
-}
-
 // Parsuj nazwę z faktury → wyciągnij jednostkę, wagę, ilość opakowania
 function parseNazwaFaktury(nazwa){
   // Przykład: "SOS MEKSYKAŃSKI 1KG BUTLA [4SZT] {FANEX}"
@@ -3078,201 +3001,6 @@ function parseNazwaFaktury(nazwa){
     .replace(/\b\w/g, c => c.toUpperCase()); // Title Case
 
   return { skrocona, wagazOpak, iloscZakupu, jednostka };
-}
-
-function parseXmlFaktura(xmlStr, fileName){
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlStr, 'text/xml');
-  const ns = 'http://crd.gov.pl/wzor/2025/06/25/13775/';
-  const get = (parent, tag) => {
-    let el = parent.getElementsByTagNameNS(ns, tag)[0]
-           || parent.getElementsByTagName(tag)[0];
-    return el ? el.textContent.trim() : '';
-  };
-
-  const podmiot1 = doc.getElementsByTagNameNS(ns,'Podmiot1')[0]
-                || doc.getElementsByTagName('Podmiot1')[0];
-  const dostawcaNazwa = podmiot1 ? get(podmiot1,'Nazwa') : '—';
-  const numer = get(doc,'P_2');
-  const data  = get(doc,'P_1');
-
-  const wiersze = [...(doc.getElementsByTagNameNS(ns,'FaWiersz').length
-    ? doc.getElementsByTagNameNS(ns,'FaWiersz')
-    : doc.getElementsByTagName('FaWiersz'))];
-
-  if(!wiersze.length){ nt('❌ Brak pozycji FaWiersz w XML'); return; }
-
-  xmlPozycje = wiersze.map(w => {
-    const nazwaFaktury = get(w,'P_7');
-    const cena_netto   = parseFloat(get(w,'P_9A')) || 0;
-    const ilosc        = parseFloat(get(w,'P_8B')) || 0;
-    const vat          = parseFloat(get(w,'P_12')) || 0;
-    const wartosc_netto= parseFloat(get(w,'P_11')) || 0;
-    const wartosc_vat  = parseFloat(get(w,'P_11Vat')) || 0;
-    const wartosc_brutto = wartosc_netto + wartosc_vat;
-    const cena_brutto  = ilosc > 0 ? wartosc_brutto / ilosc : cena_netto * (1 + vat/100);
-    const parsed = parseNazwaFaktury(nazwaFaktury);
-    const saved  = xmlMappings[nazwaFaktury] || {};
-    return {
-      nr: get(w,'NrWierszaFa'),
-      nazwaFaktury,
-      ilosc,
-      jednostka: get(w,'P_8A') || 'szt',
-      cena_netto,
-      cena_brutto,
-      wartosc_netto,
-      wartosc_brutto,
-      vat,
-      // parsed suggestions
-      skrocona:    saved.customName || parsed.skrocona,
-      wagazOpak:   saved.wagazOpak  ?? parsed.wagazOpak,
-      iloscOpak:   saved.iloscOpak  ?? parsed.iloscZakupu,
-      jednostkaOpak: saved.jednostkaOpak || parsed.jednostka,
-    };
-  });
-
-  const wartoscSum = xmlPozycje.reduce((s,p)=>s+p.wartosc_brutto,0);
-  document.getElementById('xml-faktura-info').style.display='block';
-  document.getElementById('xml-dostawca').textContent = dostawcaNazwa;
-  document.getElementById('xml-numer').textContent    = numer||'—';
-  document.getElementById('xml-data').textContent     = data||'—';
-  document.getElementById('xml-pozycji').textContent  = xmlPozycje.length;
-  document.getElementById('xml-wartosc').textContent  = wartoscSum.toFixed(2)+' zł brutto';
-  document.getElementById('xml-pozycje-wrap').style.display='block';
-
-  const ua = document.getElementById('xml-upload-area');
-  ua.style.padding='14px';
-  ua.innerHTML=`<div style="display:flex;align-items:center;gap:10px;justify-content:center">
-    <span style="font-size:1.3rem">🧾</span>
-    <span style="font-weight:600;color:var(--ac)">${fileName||'Plik wczytany'}</span>
-    <button class="btn bgh sm" onclick="document.getElementById('xml-file-inp').click()">Zmień plik</button>
-    <input type="file" id="xml-file-inp" accept=".xml,.XML" style="display:none" onchange="loadXmlFile(this)">
-  </div>`;
-
-  renderXmlTable();
-  xmlAutoMatch();
-}
-
-function renderXmlTable(){
-  const tbody = document.getElementById('xml-tbody');
-  tbody.innerHTML = '';
-  const prodOptions = ['<option value="">— nie aktualizuj —</option>',
-    ...PR.map(p=>`<option value="${p.id}">${p.nazwa}</option>`)
-  ].join('');
-
-  xmlPozycje.forEach((poz,i)=>{
-    const saved   = xmlMappings[poz.nazwaFaktury]||{};
-    const matched = saved.prodId;
-    const prod    = matched ? PR.find(p=>p.id===matched) : null;
-    const aktCena = prod ? (parseFloat(prod.cena_zakupu)||0).toFixed(2)+' zł' : '—';
-    const hasName = poz.skrocona || (xmlMappings[poz.nazwaFaktury]||{}).customName;
-    const status  = prod
-      ? `<span style="color:var(--green);font-weight:600;font-size:.75rem">✓ aktualizuj</span>`
-      : hasName
-        ? `<span style="color:var(--gold);font-weight:600;font-size:.75rem">＋ nowy</span>`
-        : `<span style="color:var(--mu);font-size:.75rem">— pomiń</span>`;
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="color:var(--mu);font-size:.75rem;text-align:center">${poz.nr}</td>
-      <td>
-        <div style="font-size:.75rem;color:var(--mu);line-height:1.3;margin-bottom:4px">${poz.nazwaFaktury}</div>
-        <input type="text" value="${poz.skrocona.replace(/"/g,'&quot;')}"
-          placeholder="Wpisz własną nazwę…"
-          style="font-size:.82rem;padding:4px 7px;width:100%"
-          onchange="xmlSetName('${poz.nazwaFaktury.replace(/'/g,"\\'")}',this.value,${i})">
-      </td>
-      <td style="text-align:center;font-size:.83rem">${poz.ilosc} ${poz.jednostka}</td>
-      <td>
-        <div style="font-size:.72rem;color:var(--mu);margin-bottom:2px">Opak.</div>
-        <div style="display:flex;gap:4px;align-items:center">
-          <input type="number" value="${poz.iloscOpak}" min="1" step="1"
-            style="width:52px;font-size:.8rem;padding:3px 5px;text-align:center"
-            title="Ilość sztuk w zamówieniu"
-            onchange="xmlSetIlosc('${poz.nazwaFaktury.replace(/'/g,"\\'")}',this.value,${i})">
-          <span style="font-size:.72rem;color:var(--mu)">szt × </span>
-          <input type="number" value="${poz.wagazOpak}" min="0" step="1"
-            style="width:60px;font-size:.8rem;padding:3px 5px;text-align:center"
-            title="Waga jednego opakowania (g)"
-            onchange="xmlSetWaga('${poz.nazwaFaktury.replace(/'/g,"\\'")}',this.value,${i})">
-          <span style="font-size:.72rem;color:var(--mu)">g</span>
-        </div>
-      </td>
-      <td style="text-align:right">
-        <div style="font-weight:700;color:var(--ac);font-size:.9rem">${poz.cena_brutto.toFixed(2)} zł</div>
-        <div style="font-size:.72rem;color:var(--mu)">brutto/szt</div>
-        <div style="font-size:.72rem;color:var(--mu)">${poz.vat}% VAT</div>
-      </td>
-      <td>
-        <select style="font-size:.8rem;width:100%;padding:5px 7px"
-          onchange="xmlSetProd('${poz.nazwaFaktury.replace(/'/g,"\\'")}',this.value,${i})">
-          ${prodOptions.replace(new RegExp(`value="${matched||'NONE'}"`), `value="${matched||''}" selected`)}
-        </select>
-      </td>
-      <td style="text-align:right;font-size:.82rem;color:var(--mu)" id="xml-akc-${i}">${aktCena}</td>
-      <td id="xml-st-${i}">${status}</td>`;
-    tbody.appendChild(tr);
-  });
-  xmlUpdateApplyBtn();
-}
-
-function xmlSetName(nazwaFaktury, customName, idx){
-  if(!xmlMappings[nazwaFaktury]) xmlMappings[nazwaFaktury]={};
-  xmlMappings[nazwaFaktury].customName = customName;
-  xmlPozycje[idx].skrocona = customName;
-  xmlSaveMappings();
-}
-function xmlSetIlosc(nazwaFaktury, val, idx){
-  if(!xmlMappings[nazwaFaktury]) xmlMappings[nazwaFaktury]={};
-  xmlMappings[nazwaFaktury].iloscOpak = parseFloat(val)||1;
-  xmlPozycje[idx].iloscOpak = parseFloat(val)||1;
-  xmlSaveMappings();
-}
-function xmlSetWaga(nazwaFaktury, val, idx){
-  if(!xmlMappings[nazwaFaktury]) xmlMappings[nazwaFaktury]={};
-  xmlMappings[nazwaFaktury].wagazOpak = parseFloat(val)||0;
-  xmlPozycje[idx].wagazOpak = parseFloat(val)||0;
-  xmlSaveMappings();
-}
-function xmlSetProd(nazwaFaktury, prodId, idx){
-  if(!xmlMappings[nazwaFaktury]) xmlMappings[nazwaFaktury]={};
-  xmlMappings[nazwaFaktury].prodId = prodId;
-  const prod = prodId ? PR.find(p=>p.id===prodId) : null;
-  const aktCena = prod ? (parseFloat(prod.cena_zakupu)||0).toFixed(2)+' zł' : '—';
-  const status = prod
-    ? `<span style="color:var(--green);font-weight:600;font-size:.75rem">✓ ok</span>`
-    : `<span style="color:var(--mu);font-size:.75rem">brak</span>`;
-  const elA = document.getElementById(`xml-akc-${idx}`);
-  const elS = document.getElementById(`xml-st-${idx}`);
-  if(elA) elA.textContent = aktCena;
-  if(elS) elS.innerHTML  = status;
-  xmlSaveMappings();
-  xmlUpdateApplyBtn();
-}
-
-function xmlAutoMatch(){
-  const ctxXml=fmBudujDopasowanie();
-  xmlPozycje.forEach(poz=>{
-    if(xmlMappings[poz.nazwaFaktury]?.prodId) return;
-    const k = fmKandydaci(xmlMappings[poz.nazwaFaktury]?.customName || poz.nazwaFaktury, ctxXml);
-    const best = k.length&&k[0].score>=0.45 ? k[0].p : null;
-    if(best){
-      if(!xmlMappings[poz.nazwaFaktury]) xmlMappings[poz.nazwaFaktury]={};
-      xmlMappings[poz.nazwaFaktury].prodId = best.id;
-    }
-  });
-  xmlSaveMappings();
-  renderXmlTable();
-  const cnt = xmlPozycje.filter(p=>xmlMappings[p.nazwaFaktury]?.prodId).length;
-  nt(`⚡ Auto-dopasowanie: ${cnt}/${xmlPozycje.length} pozycji`);
-}
-
-function xmlSimilarity(a,b){
-  const wA=a.split(/\s+/).filter(w=>w.length>2);
-  const wB=b.split(/\s+/).filter(w=>w.length>2);
-  if(!wA.length)return 0;
-  const m=wA.filter(w=>wB.some(wb=>wb.includes(w)||w.includes(wb)));
-  return m.length/wA.length;
 }
 
 // ══ DOPASOWANIE NAZW (faktura → produkt) ══
@@ -3323,78 +3051,6 @@ function fmKandydaci(nazwaFaktury,ctx){
     if(sc>=0.3)wyn.push({p:x.p,score:sc});
   });
   return wyn.sort((a,b)=>b.score-a.score).slice(0,3);
-}
-
-function xmlUpdateApplyBtn(){
-  // Count rows that will do something: either have prodId (update) or customName (new product)
-  const cnt = xmlPozycje.filter(p=>{
-    const m = xmlMappings[p.nazwaFaktury]||{};
-    return m.prodId || m.customName || p.skrocona;
-  }).length;
-  document.getElementById('xml-match-count').textContent=cnt;
-  document.getElementById('xml-apply-btn').style.display=cnt>0?'inline-flex':'none';
-}
-
-async function xmlApplyPrices(){
-  const btn=document.getElementById('xml-apply-btn');
-  btn.textContent='⏳ Aktualizuję…';btn.disabled=true;
-  let updated=0, added=0, pominieteBlad=0;
-
-  for(const poz of xmlPozycje){
-    const m = xmlMappings[poz.nazwaFaktury] || {};
-    const customName = m.customName || poz.skrocona;
-    if(!customName && !m.prodId) continue; // nic nie wpisane, pomijamy
-
-    if(!(parseFloat(poz.ilosc)>0)||!(parseFloat(poz.wartosc_brutto)>0)){pominieteBlad++;continue;}   // korekty / zerowe / ujemne pozycje
-    const newData = {
-      cena_zakupu:  poz.wartosc_brutto,
-      ilosc_zakupu: poz.ilosc,
-      jednostka:    poz.jednostka || 'szt',
-      waga_opak_g:  poz.wagazOpak || 0,
-    };
-
-    if(m.prodId){
-      // Aktualizuj istniejący produkt
-      const prod = PR.find(p=>p.id===m.prodId);
-      if(!prod) continue;
-      await dbU('produkty', m.prodId, newData);
-      Object.assign(prod, newData);
-      updated++;
-    } else if(customName){
-      // Dodaj nowy produkt
-      const nowyProd = {
-        firma: '',
-        nazwa: customName,
-        pelny_sklad: '', alergeny: '', moze_zawierac: '',
-        kcal:0, tluszcze:0, tluszcze_nas:0, weglowodany:0,
-        cukry:0, bialka:0, sole:0,
-        ...newData
-      };
-      const res = await ins('produkty', nowyProd);
-      if(res && res[0]){
-        PR.push(res[0]);
-        // Zapamiętaj mapowanie na przyszłość
-        xmlMappings[poz.nazwaFaktury] = { ...m, prodId: res[0].id };
-        added++;
-      }
-    }
-  }
-
-  xmlSaveMappings();
-  try{
-    if(!FM.brakTabel){
-      const doZap=xmlPozycje.filter(p=>xmlMappings[p.nazwaFaktury]&&xmlMappings[p.nazwaFaktury].prodId)
-        .map(p=>fmMapa(p.nazwaFaktury,xmlMappings[p.nazwaFaktury].prodId,p.wagazOpak,false,true));
-      const uniq={};doZap.forEach(m=>uniq[m.nazwa_faktury]=m);
-      await fmZapiszMapowania(Object.values(uniq));
-    }
-  }catch(e){console.warn('Nie zapisano przypisań w Supabase:',e);}
-  if(updated+added>0) await rcB();
-  btn.innerHTML=`✅ Zaktualizuj ceny (<span id="xml-match-count">${xmlPozycje.filter(p=>xmlMappings[p.nazwaFaktury]?.prodId||(xmlMappings[p.nazwaFaktury]?.customName||p.skrocona)).length}</span> produktów)`;
-  btn.disabled=false;
-  const msg = [updated && `zaktualizowano ${updated}`, added && `dodano ${added} nowych`].filter(Boolean).join(', ');
-  nt(`✅ ${msg} produktów! Food cost przeliczony.`+(pominieteBlad?` Pominięto ${pominieteBlad} pozycji z ujemną/zerową ilością lub ceną (np. korekty).`:''));
-  renP();
 }
 
 // ══════════════════════════════════════════════
@@ -3460,6 +3116,11 @@ function fmBledneProdukty(){
   return PR.filter(p=>!p.deleted_at).map(p=>{
     const pr=[];
     ['cena_zakupu','ilosc_zakupu','waga_opak_g'].forEach(k=>{const v=parseFloat(p[k]);if(v<0)pr.push((k==='cena_zakupu'?'cena':k==='ilosc_zakupu'?'ilość':'waga opak.')+' '+v);});
+    const cg=c1g(p),j=(p.jednostka||'').toLowerCase(),w=parseFloat(p.waga_opak_g)||0;
+    if(!pr.length){
+      if(cg>FM_MAX_ZL_G)pr.push('podejrzanie wysoka cena: '+fmKg(cg)+(j==='szt'||j==='opak'?', waga 1 szt = '+w+' g':''));
+      else if((j==='szt'||j==='opak')&&w>0&&w<5&&parseFloat(p.cena_zakupu)>0)pr.push('waga 1 szt = '+w+' g');
+    }
     return pr.length?{p,pr}:null;
   }).filter(Boolean);
 }
@@ -3471,7 +3132,7 @@ function fmBanerBledow(){
   const dh=dania.length?'<div style="margin-top:6px"><strong>⚠ Dania z ujemną wagą składnika:</strong> '+dania.slice(0,10).map(fmEsc).join(' &middot; ')+' <span style="color:var(--mu)">(popraw wagę w Kalkulatorze)</span></div>':'';
   if(!b.length){el.style.display='block';el.innerHTML=dh;return;}
   el.style.display='block';
-  el.innerHTML='<strong>⚠ '+b.length+' '+(b.length===1?'produkt ma ujemną wartość':'produktów ma ujemne wartości')+' (cena, ilość lub waga) — liczone jako „brak ceny", popraw je:</strong><br>'
+  el.innerHTML='<strong>⚠ '+b.length+' '+(b.length===1?'produkt ma podejrzane dane':'produktów ma podejrzane dane')+' (ujemna wartość, bardzo wysoka cena za gram albo waga opakowania poniżej 5 g) — sprawdź i popraw:</strong><br>'
     +b.slice(0,12).map(x=>fmEsc(x.p.nazwa)+' <span style="color:var(--mu)">('+x.pr.join(', ')+')</span>').join(' &middot; ')+(b.length>12?' &middot; …':'')
     +'<br><button class="btn bgh sm" style="margin-top:6px" onclick="rcB().then(()=>{renP();nt(\'✅ Food cost przeliczony\');})">↻ Przelicz food cost dań po poprawce</button>'+dh;
 }
@@ -3539,8 +3200,16 @@ function fmDaneZPozycji(poz,wagaG){
   let powod='';
   if(!(il>0)||!(ww.w>0))powod='brak ilości lub ceny na fakturze';
   else if(jedn==='szt'&&!(d.waga_opak_g>0))powod='podaj wagę 1 szt/opak. w gramach';
-  return {dane:d,c1g:powod?0:c1g(d),powod,netto:ww.netto};
+  const cg=powod?0:c1g(d);
+  // wartosci, ktore wygladaja na pomylke jednostki/wagi (np. waga 1 g => cena za gram absurdalna)
+  let podejrzane='';
+  if(!powod){
+    if(jedn==='szt'&&d.waga_opak_g>0&&d.waga_opak_g<5)podejrzane=`waga 1 szt to tylko ${d.waga_opak_g} g (czy nie miało być więcej?)`;
+    else if(cg>FM_MAX_ZL_G)podejrzane=`cena ${fmKg(cg)} (${fmG(cg)}) wygląda na pomyłkę jednostki lub wagi`;
+  }
+  return {dane:d,c1g:cg,powod,podejrzane,netto:ww.netto};
 }
+const FM_MAX_ZL_G=0.5;   // 500 zl/kg - powyzej tego automat nie zapisuje sam, tylko pyta
 function fmZaDuzaZmiana(stare,nowe){
   if(!(stare>0)||!(nowe>0))return false;
   const r=nowe/stare;return r>1+FM_MAX_ZMIANA||r<1-FM_MAX_ZMIANA;
@@ -3551,8 +3220,9 @@ function fmZaDuzaZmiana(stare,nowe){
 async function fmMigrujLokalne(){
   try{if(localStorage.getItem('fm_migr_done'))return;}catch(e){return;}
   const nowe=[];
-  Object.keys(xmlMappings||{}).forEach(n=>{
-    const m=xmlMappings[n];
+  let stare={};try{stare=JSON.parse(localStorage.getItem('xml_mappings2')||'{}')||{};}catch(e){}
+  Object.keys(stare).forEach(n=>{
+    const m=stare[n];
     if(!m||!m.prodId||FM.map[n])return;
     nowe.push(fmMapa(n,m.prodId,m.wagazOpak,false,false));
   });
@@ -3609,6 +3279,7 @@ async function fmAutomat(poz){
     const x=fmDaneZPozycji(p,m.waga_opak_g);
     const stare=c1g(prod);
     if(x.powod){doKolejki(Object.assign(p,{_powod:x.powod}));continue;}
+    if(x.podejrzane){doKolejki(Object.assign(p,{_powod:'podejrzane: '+x.podejrzane}));continue;}
     if(fmZaDuzaZmiana(stare,x.c1g)){doKolejki(Object.assign(p,{_zmiana:true}));continue;}
     zadania.push(async()=>{
       await dbU('produkty',prod.id,x.dane);
@@ -3676,7 +3347,7 @@ function fmRender(){
   const badge=document.getElementById('fm-badge');
   const qw=document.getElementById('fm-queue-wrap'),lw=document.getElementById('fm-log-wrap');
   if(FM.brakTabel){
-    info.innerHTML='Automatyczne ceny z magazynu nie są jeszcze włączone (brak tabel w Supabase lub brak dostępu). Import z pliku XML działa jak dotychczas.';
+    info.innerHTML='Automatyczne ceny z magazynu nie są jeszcze włączone (brak tabel w Supabase lub brak dostępu).';
     if(badge)badge.style.display='none';qw.style.display='none';lw.style.display='none';return;
   }
   if(FM.blad&&!FM.gotowe){info.innerHTML='⚠️ Nie udało się sprawdzić faktur z magazynu: '+fmEsc(FM.blad);return;}
@@ -3843,6 +3514,8 @@ async function fmZatwierdz(){
   const wybrane=fmWidok().widoczne.filter(e=>e.zazn&&e.prodId&&fmOcena(e).ok)
     .sort((a,b)=>String(a.ost.data_faktury||'').localeCompare(String(b.ost.data_faktury||''))||(a.ost.id-b.ost.id));
   if(!wybrane.length)return;
+  const podej=wybrane.filter(e=>e.prodId!=='__ign').map(e=>({e,x:fmDaneZPozycji(e.ost,e.waga)})).filter(z=>z.x.podejrzane);
+  if(podej.length&&!confirm('⚠ Podejrzane wartości ('+podej.length+'):\n\n'+podej.slice(0,6).map(z=>'• '+(z.e.skrocona||z.e.nazwa)+' — '+z.x.podejrzane).join('\n')+(podej.length>6?'\n• …':'')+'\n\nCzy na pewno zapisać (OK) czy wrócić i poprawić wagę/jednostkę (Anuluj)?'))return;
   btn.textContent='⏳ Zapisuję…';btn.disabled=true;
   let zmienione=0,ignor=0,bledy=0;const teraz=()=>new Date().toISOString();
   try{
